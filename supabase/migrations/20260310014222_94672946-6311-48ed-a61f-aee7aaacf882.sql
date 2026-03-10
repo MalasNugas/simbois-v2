@@ -1,0 +1,1 @@
+INSERT INTO public.user_roles (user_id, role) VALUES ('646af640-e128-43e3-85f0-4131c3cc9827', 'pegawai');
