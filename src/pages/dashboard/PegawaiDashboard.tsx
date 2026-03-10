@@ -7,10 +7,11 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
-import { Users, BookOpen, Briefcase, MapPin, Plus, CheckCircle, XCircle, Eye } from 'lucide-react';
+import { Users, BookOpen, Briefcase, MapPin, Plus, CheckCircle, XCircle, UserPlus, Filter } from 'lucide-react';
 import { format } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import ClientMapView from '@/components/ClientMapView';
 
 export default function PegawaiDashboard() {
@@ -19,29 +20,80 @@ export default function PegawaiDashboard() {
   const [programs, setPrograms] = useState<any[]>([]);
   const [registrations, setRegistrations] = useState<any[]>([]);
   const [showMap, setShowMap] = useState(false);
+  const [showOnlyMyClients, setShowOnlyMyClients] = useState(true);
   const [newProgram, setNewProgram] = useState({
     name: '', description: '', program_type: 'kepribadian', quota: 20, trainer_name: '', schedule_date: '',
   });
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [assignDialogOpen, setAssignDialogOpen] = useState(false);
+  const [unassignedClients, setUnassignedClients] = useState<any[]>([]);
 
   useEffect(() => { loadData(); }, []);
 
   const loadData = async () => {
     const [clientsRes, programsRes, regsRes] = await Promise.all([
-      supabase.from('clients').select('*, profiles!clients_user_id_fkey(*)'),
+      supabase.from('clients').select('*').order('created_at', { ascending: false }),
       supabase.from('programs').select('*').order('created_at', { ascending: false }),
-      supabase.from('program_registrations').select('*, programs(*), profiles:client_id(full_name)'),
+      supabase.from('program_registrations').select('*, programs(*)'),
     ]);
-    setClients(clientsRes.data || []);
+
+    // Fetch profiles separately for all clients
+    const clientsData = clientsRes.data || [];
+    if (clientsData.length > 0) {
+      const userIds = clientsData.map(c => c.user_id);
+      const { data: profiles } = await supabase.from('profiles').select('*').in('user_id', userIds);
+      const profileMap = new Map((profiles || []).map(p => [p.user_id, p]));
+      clientsData.forEach(c => {
+        (c as any).profile = profileMap.get(c.user_id) || null;
+      });
+    }
+
+    // Fetch client profiles for registrations
+    const regsData = regsRes.data || [];
+    if (regsData.length > 0) {
+      const clientIds = regsData.map(r => r.client_id);
+      const { data: regProfiles } = await supabase.from('profiles').select('*').in('user_id', clientIds);
+      const regProfileMap = new Map((regProfiles || []).map(p => [p.user_id, p]));
+      regsData.forEach(r => {
+        (r as any).client_profile = regProfileMap.get(r.client_id) || null;
+      });
+    }
+
+    setClients(clientsData);
     setPrograms(programsRes.data || []);
-    setRegistrations(regsRes.data || []);
+    setRegistrations(regsData);
   };
 
+  const displayedClients = showOnlyMyClients
+    ? clients.filter(c => c.assigned_pk_id === user?.id)
+    : clients;
+
   const stats = {
-    total: clients.length,
-    aktifBimbingan: clients.filter(c => c.guidance_status === 'aktif').length,
-    sudahBekerja: clients.filter(c => c.employment_status === 'sudah_bekerja').length,
-    belumBekerja: clients.filter(c => c.employment_status === 'belum_bekerja').length,
+    total: displayedClients.length,
+    aktifBimbingan: displayedClients.filter(c => c.guidance_status === 'aktif').length,
+    sudahBekerja: displayedClients.filter(c => c.employment_status === 'sudah_bekerja').length,
+    belumBekerja: displayedClients.filter(c => c.employment_status === 'belum_bekerja').length,
+  };
+
+  const openAssignDialog = () => {
+    const unassigned = clients.filter(c => !c.assigned_pk_id);
+    setUnassignedClients(unassigned);
+    setAssignDialogOpen(true);
+  };
+
+  const assignClient = async (clientId: string) => {
+    const { error } = await supabase.from('clients').update({ assigned_pk_id: user!.id }).eq('id', clientId);
+    if (error) { toast.error(error.message); return; }
+    toast.success('Klien berhasil di-assign');
+    loadData();
+    setUnassignedClients(prev => prev.filter(c => c.id !== clientId));
+  };
+
+  const unassignClient = async (clientId: string) => {
+    const { error } = await supabase.from('clients').update({ assigned_pk_id: null }).eq('id', clientId);
+    if (error) { toast.error(error.message); return; }
+    toast.success('Klien berhasil di-unassign');
+    loadData();
   };
 
   const createProgram = async () => {
@@ -85,9 +137,12 @@ export default function PegawaiDashboard() {
       <div className="container mx-auto max-w-7xl space-y-8">
         <div className="flex items-center justify-between flex-wrap gap-4">
           <h1 className="text-3xl font-bold">Dashboard Pegawai PK</h1>
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             <Button variant="outline" onClick={() => setShowMap(!showMap)}>
               <MapPin className="w-4 h-4 mr-2" /> {showMap ? 'Tutup Peta' : 'Monitoring Lokasi'}
+            </Button>
+            <Button variant="outline" onClick={openAssignDialog}>
+              <UserPlus className="w-4 h-4 mr-2" /> Assign Klien
             </Button>
             <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
               <DialogTrigger asChild>
@@ -132,6 +187,20 @@ export default function PegawaiDashboard() {
                 </div>
               </DialogContent>
             </Dialog>
+          </div>
+        </div>
+
+        {/* Filter Toggle */}
+        <div className="glass-card rounded-xl p-4 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Filter className="w-4 h-4 text-primary" />
+            <span className="text-sm font-medium">Tampilkan hanya klien saya</span>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-muted-foreground">
+              {showOnlyMyClients ? `${displayedClients.length} klien Anda` : `${clients.length} semua klien`}
+            </span>
+            <Switch checked={showOnlyMyClients} onCheckedChange={setShowOnlyMyClients} />
           </div>
         </div>
 
@@ -193,7 +262,7 @@ export default function PegawaiDashboard() {
                   <div>
                     <p className="font-medium text-sm">{(r as any).programs?.name || 'Program'}</p>
                     <p className="text-xs text-muted-foreground">
-                      Klien: {(r as any).profiles?.full_name || r.client_id} • {format(new Date(r.created_at), 'dd MMM yyyy')}
+                      Klien: {(r as any).client_profile?.full_name || r.client_id} • {format(new Date(r.created_at), 'dd MMM yyyy')}
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
@@ -219,8 +288,10 @@ export default function PegawaiDashboard() {
         {/* Client List */}
         <div>
           <h2 className="text-xl font-bold mb-4">Data Klien</h2>
-          {clients.length === 0 ? (
-            <p className="text-muted-foreground text-sm">Belum ada data klien.</p>
+          {displayedClients.length === 0 ? (
+            <p className="text-muted-foreground text-sm">
+              {showOnlyMyClients ? 'Belum ada klien yang di-assign ke Anda. Klik "Assign Klien" untuk menambahkan.' : 'Belum ada data klien.'}
+            </p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -231,24 +302,42 @@ export default function PegawaiDashboard() {
                     <th className="pb-3 text-muted-foreground font-medium">Bimbingan</th>
                     <th className="pb-3 text-muted-foreground font-medium">Pekerjaan</th>
                     <th className="pb-3 text-muted-foreground font-medium">Verifikasi</th>
+                    <th className="pb-3 text-muted-foreground font-medium">PK</th>
                     <th className="pb-3 text-muted-foreground font-medium">Aksi</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {clients.map(c => (
+                  {displayedClients.map(c => (
                     <tr key={c.id} className="border-b border-border/50">
-                      <td className="py-3">{(c as any).profiles?.full_name || '-'}</td>
+                      <td className="py-3">{(c as any).profile?.full_name || '-'}</td>
                       <td className="py-3">{c.case_number || '-'}</td>
                       <td className="py-3"><Badge variant="outline" className="capitalize">{c.guidance_status}</Badge></td>
                       <td className="py-3 capitalize">{c.employment_status?.replace('_', ' ')}</td>
-                      <td className="py-3">{(c as any).profiles?.is_verified ? <Badge variant="default">✓</Badge> : <Badge variant="secondary">✗</Badge>}</td>
+                      <td className="py-3">{(c as any).profile?.is_verified ? <Badge variant="default">✓</Badge> : <Badge variant="secondary">✗</Badge>}</td>
                       <td className="py-3">
-                        <div className="flex gap-1">
-                          {!(c as any).profiles?.is_verified && (
+                        {c.assigned_pk_id === user?.id ? (
+                          <Badge variant="default">Anda</Badge>
+                        ) : c.assigned_pk_id ? (
+                          <Badge variant="secondary">PK Lain</Badge>
+                        ) : (
+                          <Badge variant="outline">Belum</Badge>
+                        )}
+                      </td>
+                      <td className="py-3">
+                        <div className="flex gap-1 flex-wrap">
+                          {!(c as any).profile?.is_verified && (
                             <Button size="sm" variant="outline" onClick={() => verifyClient(c.user_id)}>Verifikasi</Button>
                           )}
                           {c.employment_status === 'belum_bekerja' && !c.referred_to_disnaker && (
                             <Button size="sm" variant="outline" onClick={() => referToDisnaker(c.user_id)}>Rujuk Disnaker</Button>
+                          )}
+                          {c.assigned_pk_id === user?.id && (
+                            <Button size="sm" variant="ghost" className="text-destructive" onClick={() => unassignClient(c.id)}>Lepas</Button>
+                          )}
+                          {!c.assigned_pk_id && (
+                            <Button size="sm" variant="outline" onClick={() => assignClient(c.id)}>
+                              <UserPlus className="w-3 h-3 mr-1" /> Assign
+                            </Button>
                           )}
                         </div>
                       </td>
@@ -259,6 +348,33 @@ export default function PegawaiDashboard() {
             </div>
           )}
         </div>
+
+        {/* Assign Client Dialog */}
+        <Dialog open={assignDialogOpen} onOpenChange={setAssignDialogOpen}>
+          <DialogContent className="bg-card border-border max-h-[80vh] overflow-y-auto">
+            <DialogHeader><DialogTitle>Assign Klien ke Anda</DialogTitle></DialogHeader>
+            {unassignedClients.length === 0 ? (
+              <p className="text-muted-foreground text-sm py-4">Semua klien sudah memiliki PK.</p>
+            ) : (
+              <div className="space-y-3">
+                <p className="text-sm text-muted-foreground">Pilih klien yang belum memiliki Pembimbing Kemasyarakatan:</p>
+                {unassignedClients.map(c => (
+                  <div key={c.id} className="flex items-center justify-between p-3 rounded-lg border border-border">
+                    <div>
+                      <p className="font-medium text-sm">{(c as any).profile?.full_name || 'Tanpa Nama'}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {c.case_number || 'No kasus: -'} • {c.guidance_status} • {c.employment_status?.replace('_', ' ')}
+                      </p>
+                    </div>
+                    <Button size="sm" onClick={() => assignClient(c.id)}>
+                      <UserPlus className="w-3 h-3 mr-1" /> Assign
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );
