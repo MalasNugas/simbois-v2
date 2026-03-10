@@ -4,23 +4,23 @@ import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 
 const stats = [
-  { label: 'Klien Aktif', value: '150+', icon: Users },
-  { label: 'Program Bimbingan', value: '12', icon: BookOpen },
-  { label: 'Tingkat Keberhasilan', value: '85%', icon: Target },
-];
+{ label: 'Klien Aktif', value: '150+', icon: Users },
+{ label: 'Program Bimbingan', value: '12', icon: BookOpen },
+{ label: 'Tingkat Keberhasilan', value: '85%', icon: Target }];
+
 
 const features = [
-  { icon: Users, title: 'Monitoring Klien', desc: 'Pantau aktivitas dan perkembangan klien secara real-time melalui dashboard terintegrasi.' },
-  { icon: BookOpen, title: 'Bimbingan Online', desc: 'Program bimbingan kepribadian dan kemandirian yang dapat diakses kapan saja.' },
-  { icon: MapPin, title: 'Tracking Lokasi', desc: 'Monitoring lokasi klien berbasis GPS untuk memastikan kepatuhan program reintegrasi.' },
-  { icon: Shield, title: 'Keamanan Data', desc: 'Data klien dilindungi dengan sistem keamanan berlapis dan enkripsi modern.' },
-  { icon: BarChart3, title: 'Laporan & Statistik', desc: 'Dashboard analitik lengkap untuk evaluasi efektivitas program bimbingan.' },
-  { icon: Target, title: 'Penyaluran Kerja', desc: 'Fasilitasi penempatan kerja melalui kerjasama dengan Disnaker setempat.' },
-];
+{ icon: Users, title: 'Monitoring Klien', desc: 'Pantau aktivitas dan perkembangan klien secara real-time melalui dashboard terintegrasi.' },
+{ icon: BookOpen, title: 'Bimbingan Online', desc: 'Program bimbingan kepribadian dan kemandirian yang dapat diakses kapan saja.' },
+{ icon: MapPin, title: 'Tracking Lokasi', desc: 'Monitoring lokasi klien berbasis GPS untuk memastikan kepatuhan program reintegrasi.' },
+{ icon: Shield, title: 'Keamanan Data', desc: 'Data klien dilindungi dengan sistem keamanan berlapis dan enkripsi modern.' },
+{ icon: BarChart3, title: 'Laporan & Statistik', desc: 'Dashboard analitik lengkap untuk evaluasi efektivitas program bimbingan.' },
+{ icon: Target, title: 'Penyaluran Kerja', desc: 'Fasilitasi penempatan kerja melalui kerjasama dengan Disnaker setempat.' }];
+
 
 const fadeUp = {
   hidden: { opacity: 0, y: 30 },
-  visible: (i: number) => ({ opacity: 1, y: 0, transition: { delay: i * 0.1, duration: 0.5 } }),
+  visible: (i: number) => ({ opacity: 1, y: 0, transition: { delay: i * 0.1, duration: 0.5 } })
 };
 
 export default function Index() {
@@ -42,7 +42,7 @@ export default function Index() {
               </motion.p>
               <motion.h1 variants={fadeUp} custom={1} className="text-4xl md:text-5xl lg:text-6xl font-extrabold leading-tight mb-6">
                 Selamat Datang di{' '}
-                <span className="text-gradient-gold">SIMBOS</span>
+                <span className="text-gradient-gold">SIMBOIS</span>
               </motion.h1>
               <motion.p variants={fadeUp} custom={2} className="text-muted-foreground text-lg mb-8 max-w-lg">
                 Transformasi digital pembimbingan Klien Pemasyarakatan Bapas Malang menuju reintegrasi sosial yang lebih manusiawi, terukur, dan berkelanjutan.
@@ -61,15 +61,15 @@ export default function Index() {
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: 0.4, duration: 0.6 }}
-              className="hidden lg:block"
-            >
+              className="hidden lg:block">
+              
               <div className="glass-card rounded-2xl p-8 glow-gold space-y-6">
                 {[
-                  { icon: Users, title: 'Mudah Diakses di Semua Platform', desc: 'Layanan pembimbingan yang dapat diakses kapan pun dan di mana pun.' },
-                  { icon: BookOpen, title: 'Pembimbingan Personal', desc: 'Pendampingan individual terfokus untuk setiap klien.' },
-                  { icon: Target, title: 'Terukur & Transparan', desc: 'Progres bimbingan yang dapat dipantau secara realtime.' },
-                ].map((item, i) => (
-                  <div key={i} className="flex items-start gap-4 p-4 rounded-xl bg-secondary/30 hover:bg-secondary/50 transition-colors">
+                { icon: Users, title: 'Mudah Diakses di Semua Platform', desc: 'Layanan pembimbingan yang dapat diakses kapan pun dan di mana pun.' },
+                { icon: BookOpen, title: 'Pembimbingan Personal', desc: 'Pendampingan individual terfokus untuk setiap klien.' },
+                { icon: Target, title: 'Terukur & Transparan', desc: 'Progres bimbingan yang dapat dipantau secara realtime.' }].
+                map((item, i) =>
+                <div key={i} className="flex items-start gap-4 p-4 rounded-xl bg-secondary/30 hover:bg-secondary/50 transition-colors">
                     <div className="w-10 h-10 rounded-lg gradient-gold flex items-center justify-center shrink-0">
                       <item.icon className="w-5 h-5 text-primary-foreground" />
                     </div>
@@ -78,7 +78,7 @@ export default function Index() {
                       <p className="text-xs text-muted-foreground">{item.desc}</p>
                     </div>
                   </div>
-                ))}
+                )}
               </div>
             </motion.div>
           </div>
@@ -92,27 +92,27 @@ export default function Index() {
             initial="hidden"
             whileInView="visible"
             viewport={{ once: true }}
-            className="text-center mb-12"
-          >
+            className="text-center mb-12">
+            
             <motion.h2 variants={fadeUp} custom={0} className="text-3xl font-bold mb-2">Statistik Platform</motion.h2>
             <motion.p variants={fadeUp} custom={1} className="text-muted-foreground">Data pencapaian SIMBOS Bapas Malang</motion.p>
           </motion.div>
           <div className="grid md:grid-cols-3 gap-8 max-w-3xl mx-auto">
-            {stats.map((s, i) => (
-              <motion.div
-                key={i}
-                initial="hidden"
-                whileInView="visible"
-                viewport={{ once: true }}
-                variants={fadeUp}
-                custom={i}
-                className="glass-card rounded-2xl p-8 text-center glow-gold"
-              >
+            {stats.map((s, i) =>
+            <motion.div
+              key={i}
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true }}
+              variants={fadeUp}
+              custom={i}
+              className="glass-card rounded-2xl p-8 text-center glow-gold">
+              
                 <s.icon className="w-8 h-8 text-primary mx-auto mb-3" />
                 <div className="text-3xl font-extrabold text-primary mb-1">{s.value}</div>
                 <div className="text-sm text-muted-foreground">{s.label}</div>
               </motion.div>
-            ))}
+            )}
           </div>
         </div>
       </section>
@@ -127,23 +127,23 @@ export default function Index() {
             </motion.p>
           </motion.div>
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {features.map((f, i) => (
-              <motion.div
-                key={i}
-                initial="hidden"
-                whileInView="visible"
-                viewport={{ once: true }}
-                variants={fadeUp}
-                custom={i}
-                className="glass-card rounded-2xl p-6 hover:glow-gold transition-shadow group"
-              >
+            {features.map((f, i) =>
+            <motion.div
+              key={i}
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true }}
+              variants={fadeUp}
+              custom={i}
+              className="glass-card rounded-2xl p-6 hover:glow-gold transition-shadow group">
+              
                 <div className="w-12 h-12 rounded-xl gradient-gold flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
                   <f.icon className="w-6 h-6 text-primary-foreground" />
                 </div>
                 <h3 className="font-bold text-lg mb-2 text-foreground">{f.title}</h3>
                 <p className="text-sm text-muted-foreground">{f.desc}</p>
               </motion.div>
-            ))}
+            )}
           </div>
         </div>
       </section>
@@ -171,6 +171,6 @@ export default function Index() {
           <p className="text-xs text-muted-foreground mt-1">Sistem Informasi Monitoring dan Bimbingan Online</p>
         </div>
       </footer>
-    </div>
-  );
+    </div>);
+
 }
