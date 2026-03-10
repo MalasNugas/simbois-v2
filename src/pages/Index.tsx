@@ -167,7 +167,7 @@ export default function Index() {
       <footer className="py-12 border-t border-border">
         <div className="container mx-auto px-4 text-center">
           <div className="w-10 h-10 rounded-full gradient-gold flex items-center justify-center font-bold text-sm text-primary-foreground mx-auto mb-4">SM</div>
-          <p className="text-sm text-muted-foreground">© 2026 SIMBOS — Balai Pemasyarakatan Malang</p>
+          <p className="text-sm text-muted-foreground">© 2026 SIMBOIS — Balai Pemasyarakatan Kelas I Malang        </p>
           <p className="text-xs text-muted-foreground mt-1">Sistem Informasi Monitoring dan Bimbingan Online</p>
         </div>
       </footer>
