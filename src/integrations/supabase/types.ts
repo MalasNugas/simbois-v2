@@ -99,6 +99,7 @@ export type Database = {
           avatar_url: string | null
           created_at: string | null
           full_name: string
+          gender: string | null
           id: string
           is_verified: boolean | null
           phone: string | null
@@ -110,6 +111,7 @@ export type Database = {
           avatar_url?: string | null
           created_at?: string | null
           full_name: string
+          gender?: string | null
           id?: string
           is_verified?: boolean | null
           phone?: string | null
@@ -121,6 +123,7 @@ export type Database = {
           avatar_url?: string | null
           created_at?: string | null
           full_name?: string
+          gender?: string | null
           id?: string
           is_verified?: boolean | null
           phone?: string | null
@@ -172,6 +175,7 @@ export type Database = {
           created_at: string | null
           created_by: string | null
           description: string | null
+          file_url: string | null
           id: string
           is_open: boolean | null
           name: string
@@ -187,6 +191,7 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           description?: string | null
+          file_url?: string | null
           id?: string
           is_open?: boolean | null
           name: string
@@ -202,6 +207,7 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           description?: string | null
+          file_url?: string | null
           id?: string
           is_open?: boolean | null
           name?: string
