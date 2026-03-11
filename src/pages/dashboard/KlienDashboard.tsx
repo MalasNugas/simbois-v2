@@ -2,10 +2,15 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '@/lib/auth';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { User, BookOpen, MapPin, Briefcase, Calendar, CheckCircle, Clock, XCircle, ShieldCheck } from 'lucide-react';
+import { User, BookOpen, MapPin, Briefcase, Calendar, CheckCircle, Clock, XCircle, ShieldCheck, Pencil } from 'lucide-react';
 import { format } from 'date-fns';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 
 export default function KlienDashboard() {
   const { user } = useAuth();
@@ -15,6 +20,8 @@ export default function KlienDashboard() {
   const [registrations, setRegistrations] = useState<any[]>([]);
   const [trackingEnabled, setTrackingEnabled] = useState(false);
   const [pkName, setPkName] = useState<string | null>(null);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editForm, setEditForm] = useState({ full_name: '', gender: '', phone: '', address: '' });
 
   useEffect(() => {
     if (!user) return;
@@ -28,29 +35,36 @@ export default function KlienDashboard() {
       supabase.from('programs').select('*').eq('is_open', true).order('schedule_date', { ascending: true }),
       supabase.from('program_registrations').select('*, programs(*)').eq('client_id', user!.id),
     ]);
-    setProfile(profileRes.data);
+    const p = profileRes.data;
+    setProfile(p);
+    if (p) setEditForm({ full_name: p.full_name || '', gender: (p as any).gender || '', phone: p.phone || '', address: p.address || '' });
     setClient(clientRes.data);
     setPrograms(programsRes.data || []);
     setRegistrations(regsRes.data || []);
 
-    // Fetch assigned PK name
     if (clientRes.data?.assigned_pk_id) {
-      const { data: pkProfile } = await supabase
-        .from('profiles')
-        .select('full_name')
-        .eq('user_id', clientRes.data.assigned_pk_id)
-        .maybeSingle();
+      const { data: pkProfile } = await supabase.from('profiles').select('full_name').eq('user_id', clientRes.data.assigned_pk_id).maybeSingle();
       setPkName(pkProfile?.full_name || null);
     } else {
       setPkName(null);
     }
   };
 
+  const saveProfile = async () => {
+    const { error } = await supabase.from('profiles').update({
+      full_name: editForm.full_name,
+      gender: editForm.gender || null,
+      phone: editForm.phone || null,
+      address: editForm.address || null,
+    } as any).eq('user_id', user!.id);
+    if (error) { toast.error(error.message); return; }
+    toast.success('Profil berhasil diperbarui');
+    setEditDialogOpen(false);
+    loadData();
+  };
+
   const registerProgram = async (programId: string) => {
-    const { error } = await supabase.from('program_registrations').insert({
-      program_id: programId,
-      client_id: user!.id,
-    });
+    const { error } = await supabase.from('program_registrations').insert({ program_id: programId, client_id: user!.id });
     if (error) {
       toast.error(error.message.includes('duplicate') ? 'Anda sudah terdaftar di program ini' : error.message);
     } else {
@@ -60,17 +74,11 @@ export default function KlienDashboard() {
   };
 
   const startTracking = () => {
-    if (!navigator.geolocation) {
-      toast.error('Browser tidak mendukung Geolocation');
-      return;
-    }
+    if (!navigator.geolocation) { toast.error('Browser tidak mendukung Geolocation'); return; }
     navigator.geolocation.watchPosition(
       async (pos) => {
         await supabase.from('location_tracking').insert({
-          user_id: user!.id,
-          latitude: pos.coords.latitude,
-          longitude: pos.coords.longitude,
-          accuracy: pos.coords.accuracy,
+          user_id: user!.id, latitude: pos.coords.latitude, longitude: pos.coords.longitude, accuracy: pos.coords.accuracy,
         });
       },
       (err) => toast.error('Gagal mendapatkan lokasi: ' + err.message),
@@ -91,9 +99,11 @@ export default function KlienDashboard() {
   };
 
   const employmentLabel: Record<string, string> = {
-    belum_bekerja: 'Belum Bekerja',
-    sedang_pelatihan: 'Sedang Pelatihan',
-    sudah_bekerja: 'Sudah Bekerja',
+    belum_bekerja: 'Belum Bekerja', sedang_pelatihan: 'Sedang Pelatihan', sudah_bekerja: 'Sudah Bekerja',
+  };
+
+  const genderLabel: Record<string, string> = {
+    laki_laki: 'Laki-laki', perempuan: 'Perempuan',
   };
 
   return (
@@ -101,17 +111,24 @@ export default function KlienDashboard() {
       <div className="container mx-auto max-w-6xl space-y-8">
         <h1 className="text-3xl font-bold">Dashboard Klien</h1>
 
-        {/* Profile & Status Cards */}
         <div className="grid md:grid-cols-3 gap-6">
+          {/* Profile Card */}
           <div className="glass-card rounded-2xl p-6">
-            <div className="flex items-center gap-3 mb-4">
-              <User className="w-5 h-5 text-primary" />
-              <h2 className="font-semibold">Profil</h2>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <User className="w-5 h-5 text-primary" />
+                <h2 className="font-semibold">Profil</h2>
+              </div>
+              <Button size="sm" variant="ghost" onClick={() => setEditDialogOpen(true)}>
+                <Pencil className="w-4 h-4" />
+              </Button>
             </div>
             <div className="space-y-2 text-sm">
               <p><span className="text-muted-foreground">Nama:</span> {profile?.full_name}</p>
               <p><span className="text-muted-foreground">Email:</span> {user?.email}</p>
+              <p><span className="text-muted-foreground">Jenis Kelamin:</span> {genderLabel[(profile as any)?.gender] || '-'}</p>
               <p><span className="text-muted-foreground">Telepon:</span> {profile?.phone || '-'}</p>
+              <p><span className="text-muted-foreground">Alamat:</span> {profile?.address || '-'}</p>
               <p><span className="text-muted-foreground">Verifikasi:</span> {profile?.is_verified ? <Badge variant="default">Terverifikasi</Badge> : <Badge variant="secondary">Belum</Badge>}</p>
             </div>
           </div>
@@ -129,7 +146,6 @@ export default function KlienDashboard() {
             </div>
           </div>
 
-          {/* Pembimbing PK Card */}
           <div className="glass-card rounded-2xl p-6">
             <div className="flex items-center gap-3 mb-4">
               <ShieldCheck className="w-5 h-5 text-primary" />
@@ -146,7 +162,7 @@ export default function KlienDashboard() {
           </div>
         </div>
 
-        {/* GPS Card - moved below */}
+        {/* GPS */}
         <div className="glass-card rounded-2xl p-6">
           <div className="flex items-center gap-3 mb-4">
             <MapPin className="w-5 h-5 text-primary" />
@@ -158,7 +174,7 @@ export default function KlienDashboard() {
           </Button>
         </div>
 
-        {/* Available Programs */}
+        {/* Programs */}
         <div>
           <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
             <BookOpen className="w-5 h-5 text-primary" /> Program Bimbingan Tersedia
@@ -185,13 +201,10 @@ export default function KlienDashboard() {
                       </p>
                     )}
                     {p.trainer_name && <p className="text-xs text-muted-foreground">Pelatih: {p.trainer_name}</p>}
-                    <Button
-                      size="sm"
-                      variant={registered ? 'secondary' : 'default'}
-                      disabled={registered}
-                      onClick={() => registerProgram(p.id)}
-                      className="w-full"
-                    >
+                    {(p as any).file_url && (
+                      <a href={(p as any).file_url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary underline">📄 Lihat Dokumen PDF</a>
+                    )}
+                    <Button size="sm" variant={registered ? 'secondary' : 'default'} disabled={registered} onClick={() => registerProgram(p.id)} className="w-full">
                       {registered ? 'Sudah Terdaftar' : 'Daftar Program'}
                     </Button>
                   </div>
@@ -222,6 +235,38 @@ export default function KlienDashboard() {
             </div>
           )}
         </div>
+
+        {/* Edit Profile Dialog */}
+        <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+          <DialogContent className="bg-card border-border">
+            <DialogHeader><DialogTitle>Edit Profil</DialogTitle></DialogHeader>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Nama Lengkap</Label>
+                <Input value={editForm.full_name} onChange={e => setEditForm(f => ({ ...f, full_name: e.target.value }))} />
+              </div>
+              <div className="space-y-2">
+                <Label>Jenis Kelamin</Label>
+                <Select value={editForm.gender} onValueChange={v => setEditForm(f => ({ ...f, gender: v }))}>
+                  <SelectTrigger><SelectValue placeholder="Pilih jenis kelamin" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="laki_laki">Laki-laki</SelectItem>
+                    <SelectItem value="perempuan">Perempuan</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>No. Telepon</Label>
+                <Input value={editForm.phone} onChange={e => setEditForm(f => ({ ...f, phone: e.target.value }))} placeholder="08xxxxxxxxxx" />
+              </div>
+              <div className="space-y-2">
+                <Label>Alamat</Label>
+                <Textarea value={editForm.address} onChange={e => setEditForm(f => ({ ...f, address: e.target.value }))} placeholder="Masukkan alamat lengkap" />
+              </div>
+              <Button onClick={saveProfile} className="w-full">Simpan Profil</Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );
