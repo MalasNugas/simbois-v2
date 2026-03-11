@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useAuth } from '@/lib/auth';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
-import { Users, BookOpen, Briefcase, MapPin, Plus, CheckCircle, XCircle, UserPlus, Filter, Search, Pencil, Trash2 } from 'lucide-react';
+import { Users, BookOpen, Briefcase, MapPin, Plus, CheckCircle, XCircle, UserPlus, Filter, Search, Pencil, Trash2, FileUp, FileText } from 'lucide-react';
 import { format } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -32,6 +32,9 @@ export default function PegawaiDashboard() {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [programToDelete, setProgramToDelete] = useState<any>(null);
+  const [uploadingPdf, setUploadingPdf] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const editFileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { loadData(); }, []);
 
@@ -47,9 +50,7 @@ export default function PegawaiDashboard() {
       const userIds = clientsData.map(c => c.user_id);
       const { data: profiles } = await supabase.from('profiles').select('*').in('user_id', userIds);
       const profileMap = new Map((profiles || []).map(p => [p.user_id, p]));
-      clientsData.forEach(c => {
-        (c as any).profile = profileMap.get(c.user_id) || null;
-      });
+      clientsData.forEach(c => { (c as any).profile = profileMap.get(c.user_id) || null; });
     }
 
     const regsData = regsRes.data || [];
@@ -57,14 +58,24 @@ export default function PegawaiDashboard() {
       const clientIds = regsData.map(r => r.client_id);
       const { data: regProfiles } = await supabase.from('profiles').select('*').in('user_id', clientIds);
       const regProfileMap = new Map((regProfiles || []).map(p => [p.user_id, p]));
-      regsData.forEach(r => {
-        (r as any).client_profile = regProfileMap.get(r.client_id) || null;
-      });
+      regsData.forEach(r => { (r as any).client_profile = regProfileMap.get(r.client_id) || null; });
     }
 
     setClients(clientsData);
     setPrograms(programsRes.data || []);
     setRegistrations(regsData);
+  };
+
+  const uploadPdf = async (file: File): Promise<string | null> => {
+    if (file.type !== 'application/pdf') { toast.error('Hanya file PDF yang diizinkan'); return null; }
+    if (file.size > 10 * 1024 * 1024) { toast.error('Ukuran file maksimal 10MB'); return null; }
+    setUploadingPdf(true);
+    const fileName = `${Date.now()}-${file.name}`;
+    const { error } = await supabase.storage.from('program-files').upload(fileName, file);
+    setUploadingPdf(false);
+    if (error) { toast.error('Gagal upload: ' + error.message); return null; }
+    const { data: urlData } = supabase.storage.from('program-files').getPublicUrl(fileName);
+    return urlData.publicUrl;
   };
 
   const displayedClients = clients
@@ -106,17 +117,26 @@ export default function PegawaiDashboard() {
 
   const createProgram = async () => {
     if (!newProgram.name.trim()) { toast.error('Nama program wajib diisi'); return; }
+
+    let fileUrl: string | null = null;
+    if (fileInputRef.current?.files?.[0]) {
+      fileUrl = await uploadPdf(fileInputRef.current.files[0]);
+      if (fileUrl === null && fileInputRef.current.files[0]) return;
+    }
+
     const { error } = await supabase.from('programs').insert({
       ...newProgram,
       quota: Number(newProgram.quota),
       schedule_date: newProgram.schedule_date || null,
       is_open: true,
       created_by: user!.id,
-    });
+      file_url: fileUrl,
+    } as any);
     if (error) { toast.error(error.message); return; }
     toast.success('Program berhasil dibuat');
     setDialogOpen(false);
     setNewProgram({ name: '', description: '', program_type: 'kepribadian', quota: 20, trainer_name: '', schedule_date: '' });
+    if (fileInputRef.current) fileInputRef.current.value = '';
     loadData();
   };
 
@@ -130,6 +150,14 @@ export default function PegawaiDashboard() {
 
   const updateProgram = async () => {
     if (!editingProgram) return;
+
+    let fileUrl = editingProgram.file_url;
+    if (editFileInputRef.current?.files?.[0]) {
+      const url = await uploadPdf(editFileInputRef.current.files[0]);
+      if (url === null) return;
+      fileUrl = url;
+    }
+
     const { error } = await supabase.from('programs').update({
       name: editingProgram.name,
       description: editingProgram.description,
@@ -138,11 +166,13 @@ export default function PegawaiDashboard() {
       trainer_name: editingProgram.trainer_name,
       schedule_date: editingProgram.schedule_date || null,
       is_open: editingProgram.is_open,
-    }).eq('id', editingProgram.id);
+      file_url: fileUrl,
+    } as any).eq('id', editingProgram.id);
     if (error) { toast.error(error.message); return; }
     toast.success('Program berhasil diperbarui');
     setEditDialogOpen(false);
     setEditingProgram(null);
+    if (editFileInputRef.current) editFileInputRef.current.value = '';
     loadData();
   };
 
@@ -181,7 +211,7 @@ export default function PegawaiDashboard() {
     else { toast.success('Klien dirujuk ke Disnaker'); loadData(); }
   };
 
-  const programForm = (values: any, onChange: (v: any) => void) => (
+  const programForm = (values: any, onChange: (v: any) => void, inputRef?: React.RefObject<HTMLInputElement>) => (
     <div className="space-y-4">
       <div className="space-y-2">
         <Label>Nama Program</Label>
@@ -215,6 +245,17 @@ export default function PegawaiDashboard() {
         <Label>Nama Pelatih (opsional)</Label>
         <Input value={values.trainer_name || ''} onChange={e => onChange({ ...values, trainer_name: e.target.value })} />
       </div>
+      <div className="space-y-2">
+        <Label>File PDF (opsional)</Label>
+        <div className="flex items-center gap-2">
+          <Input type="file" accept=".pdf" ref={inputRef as any} className="file:mr-2 file:py-1 file:px-3 file:rounded file:border-0 file:text-sm file:bg-primary file:text-primary-foreground" />
+          {values.file_url && (
+            <a href={values.file_url} target="_blank" rel="noopener noreferrer" className="shrink-0">
+              <Badge variant="outline" className="gap-1"><FileText className="w-3 h-3" /> PDF</Badge>
+            </a>
+          )}
+        </div>
+      </div>
     </div>
   );
 
@@ -234,10 +275,12 @@ export default function PegawaiDashboard() {
               <DialogTrigger asChild>
                 <Button><Plus className="w-4 h-4 mr-2" /> Buat Program</Button>
               </DialogTrigger>
-              <DialogContent className="bg-card border-border">
+              <DialogContent className="bg-card border-border max-h-[85vh] overflow-y-auto">
                 <DialogHeader><DialogTitle>Buat Program Bimbingan</DialogTitle></DialogHeader>
-                {programForm(newProgram, setNewProgram)}
-                <Button onClick={createProgram} className="w-full">Simpan Program</Button>
+                {programForm(newProgram, setNewProgram, fileInputRef)}
+                <Button onClick={createProgram} disabled={uploadingPdf} className="w-full">
+                  {uploadingPdf ? 'Mengupload...' : 'Simpan Program'}
+                </Button>
               </DialogContent>
             </Dialog>
           </div>
@@ -255,12 +298,7 @@ export default function PegawaiDashboard() {
           </div>
           <div className="relative w-full sm:w-72">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              placeholder="Cari nama atau no. kasus..."
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              className="pl-9"
-            />
+            <Input placeholder="Cari nama atau no. kasus..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-9" />
           </div>
         </div>
 
@@ -288,7 +326,7 @@ export default function PegawaiDashboard() {
           </div>
         )}
 
-        {/* Programs with CRUD */}
+        {/* Programs */}
         <div>
           <h2 className="text-xl font-bold mb-4">Program Bimbingan</h2>
           {programs.length === 0 ? (
@@ -306,6 +344,11 @@ export default function PegawaiDashboard() {
                   <p className="text-xs text-muted-foreground">Kuota: {p.quota} {p.trainer_name && `• Pelatih: ${p.trainer_name}`}</p>
                   {p.schedule_date && (
                     <p className="text-xs text-muted-foreground">Jadwal: {format(new Date(p.schedule_date), 'dd MMM yyyy HH:mm')}</p>
+                  )}
+                  {(p as any).file_url && (
+                    <a href={(p as any).file_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-primary underline">
+                      <FileText className="w-3 h-3" /> Lihat PDF
+                    </a>
                   )}
                   <div className="flex gap-2 pt-2">
                     <Button size="sm" variant="outline" onClick={() => openEditProgram(p)}>
@@ -449,17 +492,19 @@ export default function PegawaiDashboard() {
 
         {/* Edit Program Dialog */}
         <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-          <DialogContent className="bg-card border-border">
+          <DialogContent className="bg-card border-border max-h-[85vh] overflow-y-auto">
             <DialogHeader><DialogTitle>Edit Program</DialogTitle></DialogHeader>
             {editingProgram && (
               <>
-                {programForm(editingProgram, setEditingProgram)}
+                {programForm(editingProgram, setEditingProgram, editFileInputRef)}
                 <div className="flex items-center gap-3 pt-2">
                   <Label>Status Program</Label>
                   <Switch checked={editingProgram.is_open} onCheckedChange={v => setEditingProgram((p: any) => ({ ...p, is_open: v }))} />
                   <span className="text-sm text-muted-foreground">{editingProgram.is_open ? 'Dibuka' : 'Ditutup'}</span>
                 </div>
-                <Button onClick={updateProgram} className="w-full">Simpan Perubahan</Button>
+                <Button onClick={updateProgram} disabled={uploadingPdf} className="w-full">
+                  {uploadingPdf ? 'Mengupload...' : 'Simpan Perubahan'}
+                </Button>
               </>
             )}
           </DialogContent>
