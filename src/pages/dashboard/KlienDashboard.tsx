@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { User, BookOpen, MapPin, Briefcase, Calendar, CheckCircle, Clock, XCircle } from 'lucide-react';
+import { User, BookOpen, MapPin, Briefcase, Calendar, CheckCircle, Clock, XCircle, ShieldCheck } from 'lucide-react';
 import { format } from 'date-fns';
 
 export default function KlienDashboard() {
@@ -14,6 +14,7 @@ export default function KlienDashboard() {
   const [programs, setPrograms] = useState<any[]>([]);
   const [registrations, setRegistrations] = useState<any[]>([]);
   const [trackingEnabled, setTrackingEnabled] = useState(false);
+  const [pkName, setPkName] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -31,6 +32,18 @@ export default function KlienDashboard() {
     setClient(clientRes.data);
     setPrograms(programsRes.data || []);
     setRegistrations(regsRes.data || []);
+
+    // Fetch assigned PK name
+    if (clientRes.data?.assigned_pk_id) {
+      const { data: pkProfile } = await supabase
+        .from('profiles')
+        .select('full_name')
+        .eq('user_id', clientRes.data.assigned_pk_id)
+        .maybeSingle();
+      setPkName(pkProfile?.full_name || null);
+    } else {
+      setPkName(null);
+    }
   };
 
   const registerProgram = async (programId: string) => {
@@ -116,16 +129,33 @@ export default function KlienDashboard() {
             </div>
           </div>
 
+          {/* Pembimbing PK Card */}
           <div className="glass-card rounded-2xl p-6">
             <div className="flex items-center gap-3 mb-4">
-              <MapPin className="w-5 h-5 text-primary" />
-              <h2 className="font-semibold">Lokasi GPS</h2>
+              <ShieldCheck className="w-5 h-5 text-primary" />
+              <h2 className="font-semibold">Pembimbing Kemasyarakatan</h2>
             </div>
-            <p className="text-sm text-muted-foreground mb-4">Aktifkan tracking lokasi untuk monitoring oleh petugas.</p>
-            <Button onClick={startTracking} disabled={trackingEnabled} size="sm" className="w-full">
-              {trackingEnabled ? '✓ Tracking Aktif' : 'Aktifkan Tracking'}
-            </Button>
+            {pkName ? (
+              <div className="space-y-2 text-sm">
+                <p className="font-medium text-lg">{pkName}</p>
+                <Badge variant="default">Telah Ditugaskan</Badge>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">Belum ada Pembimbing PK yang ditugaskan untuk Anda.</p>
+            )}
           </div>
+        </div>
+
+        {/* GPS Card - moved below */}
+        <div className="glass-card rounded-2xl p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <MapPin className="w-5 h-5 text-primary" />
+            <h2 className="font-semibold">Lokasi GPS</h2>
+          </div>
+          <p className="text-sm text-muted-foreground mb-4">Aktifkan tracking lokasi untuk monitoring oleh petugas.</p>
+          <Button onClick={startTracking} disabled={trackingEnabled} size="sm">
+            {trackingEnabled ? '✓ Tracking Aktif' : 'Aktifkan Tracking'}
+          </Button>
         </div>
 
         {/* Available Programs */}

@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
-import { Users, BookOpen, Briefcase, MapPin, Plus, CheckCircle, XCircle, UserPlus, Filter } from 'lucide-react';
+import { Users, BookOpen, Briefcase, MapPin, Plus, CheckCircle, XCircle, UserPlus, Filter, Search, Pencil, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -21,12 +21,17 @@ export default function PegawaiDashboard() {
   const [registrations, setRegistrations] = useState<any[]>([]);
   const [showMap, setShowMap] = useState(false);
   const [showOnlyMyClients, setShowOnlyMyClients] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
   const [newProgram, setNewProgram] = useState({
     name: '', description: '', program_type: 'kepribadian', quota: 20, trainer_name: '', schedule_date: '',
   });
   const [dialogOpen, setDialogOpen] = useState(false);
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const [unassignedClients, setUnassignedClients] = useState<any[]>([]);
+  const [editingProgram, setEditingProgram] = useState<any>(null);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [programToDelete, setProgramToDelete] = useState<any>(null);
 
   useEffect(() => { loadData(); }, []);
 
@@ -37,7 +42,6 @@ export default function PegawaiDashboard() {
       supabase.from('program_registrations').select('*, programs(*)'),
     ]);
 
-    // Fetch profiles separately for all clients
     const clientsData = clientsRes.data || [];
     if (clientsData.length > 0) {
       const userIds = clientsData.map(c => c.user_id);
@@ -48,7 +52,6 @@ export default function PegawaiDashboard() {
       });
     }
 
-    // Fetch client profiles for registrations
     const regsData = regsRes.data || [];
     if (regsData.length > 0) {
       const clientIds = regsData.map(r => r.client_id);
@@ -64,9 +67,15 @@ export default function PegawaiDashboard() {
     setRegistrations(regsData);
   };
 
-  const displayedClients = showOnlyMyClients
-    ? clients.filter(c => c.assigned_pk_id === user?.id)
-    : clients;
+  const displayedClients = clients
+    .filter(c => !showOnlyMyClients || c.assigned_pk_id === user?.id)
+    .filter(c => {
+      if (!searchQuery.trim()) return true;
+      const name = ((c as any).profile?.full_name || '').toLowerCase();
+      const caseNum = (c.case_number || '').toLowerCase();
+      const q = searchQuery.toLowerCase();
+      return name.includes(q) || caseNum.includes(q);
+    });
 
   const stats = {
     total: displayedClients.length,
@@ -76,8 +85,7 @@ export default function PegawaiDashboard() {
   };
 
   const openAssignDialog = () => {
-    const unassigned = clients.filter(c => !c.assigned_pk_id);
-    setUnassignedClients(unassigned);
+    setUnassignedClients(clients.filter(c => !c.assigned_pk_id));
     setAssignDialogOpen(true);
   };
 
@@ -112,6 +120,47 @@ export default function PegawaiDashboard() {
     loadData();
   };
 
+  const openEditProgram = (program: any) => {
+    setEditingProgram({
+      ...program,
+      schedule_date: program.schedule_date ? program.schedule_date.slice(0, 16) : '',
+    });
+    setEditDialogOpen(true);
+  };
+
+  const updateProgram = async () => {
+    if (!editingProgram) return;
+    const { error } = await supabase.from('programs').update({
+      name: editingProgram.name,
+      description: editingProgram.description,
+      program_type: editingProgram.program_type,
+      quota: Number(editingProgram.quota),
+      trainer_name: editingProgram.trainer_name,
+      schedule_date: editingProgram.schedule_date || null,
+      is_open: editingProgram.is_open,
+    }).eq('id', editingProgram.id);
+    if (error) { toast.error(error.message); return; }
+    toast.success('Program berhasil diperbarui');
+    setEditDialogOpen(false);
+    setEditingProgram(null);
+    loadData();
+  };
+
+  const confirmDeleteProgram = (program: any) => {
+    setProgramToDelete(program);
+    setDeleteDialogOpen(true);
+  };
+
+  const deleteProgram = async () => {
+    if (!programToDelete) return;
+    const { error } = await supabase.from('programs').delete().eq('id', programToDelete.id);
+    if (error) { toast.error(error.message); return; }
+    toast.success('Program berhasil dihapus');
+    setDeleteDialogOpen(false);
+    setProgramToDelete(null);
+    loadData();
+  };
+
   const updateRegistration = async (id: string, status: 'approved' | 'rejected') => {
     const { error } = await supabase.from('program_registrations').update({
       status, reviewed_by: user!.id, reviewed_at: new Date().toISOString(),
@@ -132,6 +181,43 @@ export default function PegawaiDashboard() {
     else { toast.success('Klien dirujuk ke Disnaker'); loadData(); }
   };
 
+  const programForm = (values: any, onChange: (v: any) => void) => (
+    <div className="space-y-4">
+      <div className="space-y-2">
+        <Label>Nama Program</Label>
+        <Input value={values.name} onChange={e => onChange({ ...values, name: e.target.value })} />
+      </div>
+      <div className="space-y-2">
+        <Label>Deskripsi</Label>
+        <Textarea value={values.description || ''} onChange={e => onChange({ ...values, description: e.target.value })} />
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label>Tipe</Label>
+          <Select value={values.program_type} onValueChange={v => onChange({ ...values, program_type: v })}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="kepribadian">Kepribadian</SelectItem>
+              <SelectItem value="kemandirian">Kemandirian</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-2">
+          <Label>Kuota</Label>
+          <Input type="number" value={values.quota} onChange={e => onChange({ ...values, quota: Number(e.target.value) })} />
+        </div>
+      </div>
+      <div className="space-y-2">
+        <Label>Jadwal</Label>
+        <Input type="datetime-local" value={values.schedule_date || ''} onChange={e => onChange({ ...values, schedule_date: e.target.value })} />
+      </div>
+      <div className="space-y-2">
+        <Label>Nama Pelatih (opsional)</Label>
+        <Input value={values.trainer_name || ''} onChange={e => onChange({ ...values, trainer_name: e.target.value })} />
+      </div>
+    </div>
+  );
+
   return (
     <div className="min-h-screen pt-20 pb-12 px-4">
       <div className="container mx-auto max-w-7xl space-y-8">
@@ -150,57 +236,31 @@ export default function PegawaiDashboard() {
               </DialogTrigger>
               <DialogContent className="bg-card border-border">
                 <DialogHeader><DialogTitle>Buat Program Bimbingan</DialogTitle></DialogHeader>
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label>Nama Program</Label>
-                    <Input value={newProgram.name} onChange={e => setNewProgram(p => ({ ...p, name: e.target.value }))} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Deskripsi</Label>
-                    <Textarea value={newProgram.description} onChange={e => setNewProgram(p => ({ ...p, description: e.target.value }))} />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Tipe</Label>
-                      <Select value={newProgram.program_type} onValueChange={v => setNewProgram(p => ({ ...p, program_type: v }))}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="kepribadian">Kepribadian</SelectItem>
-                          <SelectItem value="kemandirian">Kemandirian</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Kuota</Label>
-                      <Input type="number" value={newProgram.quota} onChange={e => setNewProgram(p => ({ ...p, quota: Number(e.target.value) }))} />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Jadwal</Label>
-                    <Input type="datetime-local" value={newProgram.schedule_date} onChange={e => setNewProgram(p => ({ ...p, schedule_date: e.target.value }))} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Nama Pelatih (opsional)</Label>
-                    <Input value={newProgram.trainer_name} onChange={e => setNewProgram(p => ({ ...p, trainer_name: e.target.value }))} />
-                  </div>
-                  <Button onClick={createProgram} className="w-full">Simpan Program</Button>
-                </div>
+                {programForm(newProgram, setNewProgram)}
+                <Button onClick={createProgram} className="w-full">Simpan Program</Button>
               </DialogContent>
             </Dialog>
           </div>
         </div>
 
-        {/* Filter Toggle */}
-        <div className="glass-card rounded-xl p-4 flex items-center justify-between">
+        {/* Filter & Search */}
+        <div className="glass-card rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="flex items-center gap-2">
             <Filter className="w-4 h-4 text-primary" />
             <span className="text-sm font-medium">Tampilkan hanya klien saya</span>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="text-xs text-muted-foreground">
-              {showOnlyMyClients ? `${displayedClients.length} klien Anda` : `${clients.length} semua klien`}
-            </span>
             <Switch checked={showOnlyMyClients} onCheckedChange={setShowOnlyMyClients} />
+            <span className="text-xs text-muted-foreground ml-2">
+              {showOnlyMyClients ? `${displayedClients.length} klien Anda` : `${displayedClients.length} klien`}
+            </span>
+          </div>
+          <div className="relative w-full sm:w-72">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder="Cari nama atau no. kasus..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              className="pl-9"
+            />
           </div>
         </div>
 
@@ -228,7 +288,7 @@ export default function PegawaiDashboard() {
           </div>
         )}
 
-        {/* Programs */}
+        {/* Programs with CRUD */}
         <div>
           <h2 className="text-xl font-bold mb-4">Program Bimbingan</h2>
           {programs.length === 0 ? (
@@ -244,6 +304,17 @@ export default function PegawaiDashboard() {
                   <Badge variant="outline" className="capitalize">{p.program_type}</Badge>
                   <p className="text-sm text-muted-foreground">{p.description}</p>
                   <p className="text-xs text-muted-foreground">Kuota: {p.quota} {p.trainer_name && `• Pelatih: ${p.trainer_name}`}</p>
+                  {p.schedule_date && (
+                    <p className="text-xs text-muted-foreground">Jadwal: {format(new Date(p.schedule_date), 'dd MMM yyyy HH:mm')}</p>
+                  )}
+                  <div className="flex gap-2 pt-2">
+                    <Button size="sm" variant="outline" onClick={() => openEditProgram(p)}>
+                      <Pencil className="w-3 h-3 mr-1" /> Edit
+                    </Button>
+                    <Button size="sm" variant="destructive" onClick={() => confirmDeleteProgram(p)}>
+                      <Trash2 className="w-3 h-3 mr-1" /> Hapus
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -290,7 +361,7 @@ export default function PegawaiDashboard() {
           <h2 className="text-xl font-bold mb-4">Data Klien</h2>
           {displayedClients.length === 0 ? (
             <p className="text-muted-foreground text-sm">
-              {showOnlyMyClients ? 'Belum ada klien yang di-assign ke Anda. Klik "Assign Klien" untuk menambahkan.' : 'Belum ada data klien.'}
+              {searchQuery ? 'Tidak ditemukan klien dengan pencarian tersebut.' : showOnlyMyClients ? 'Belum ada klien yang di-assign ke Anda.' : 'Belum ada data klien.'}
             </p>
           ) : (
             <div className="overflow-x-auto">
@@ -373,6 +444,38 @@ export default function PegawaiDashboard() {
                 ))}
               </div>
             )}
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit Program Dialog */}
+        <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+          <DialogContent className="bg-card border-border">
+            <DialogHeader><DialogTitle>Edit Program</DialogTitle></DialogHeader>
+            {editingProgram && (
+              <>
+                {programForm(editingProgram, setEditingProgram)}
+                <div className="flex items-center gap-3 pt-2">
+                  <Label>Status Program</Label>
+                  <Switch checked={editingProgram.is_open} onCheckedChange={v => setEditingProgram((p: any) => ({ ...p, is_open: v }))} />
+                  <span className="text-sm text-muted-foreground">{editingProgram.is_open ? 'Dibuka' : 'Ditutup'}</span>
+                </div>
+                <Button onClick={updateProgram} className="w-full">Simpan Perubahan</Button>
+              </>
+            )}
+          </DialogContent>
+        </Dialog>
+
+        {/* Delete Program Confirmation */}
+        <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <DialogContent className="bg-card border-border">
+            <DialogHeader><DialogTitle>Hapus Program</DialogTitle></DialogHeader>
+            <p className="text-sm text-muted-foreground">
+              Apakah Anda yakin ingin menghapus program <strong>{programToDelete?.name}</strong>? Tindakan ini tidak dapat dibatalkan.
+            </p>
+            <div className="flex gap-3 justify-end pt-2">
+              <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>Batal</Button>
+              <Button variant="destructive" onClick={deleteProgram}>Hapus</Button>
+            </div>
           </DialogContent>
         </Dialog>
       </div>
