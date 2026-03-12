@@ -85,7 +85,7 @@ export default function ClientMapView() {
           <Marker key={`${loc.user_id}-${i}`} position={[loc.latitude, loc.longitude]}>
             <Popup>
               <div className="text-xs">
-                <p className="font-semibold">Klien: {loc.user_id.slice(0, 8)}...</p>
+                <p className="font-semibold">Klien: {loc.profile_name || loc.user_id.slice(0, 8)}</p>
                 <p>Lat: {loc.latitude.toFixed(6)}</p>
                 <p>Lng: {loc.longitude.toFixed(6)}</p>
                 <p>Waktu: {new Date(loc.tracked_at).toLocaleString('id-ID')}</p>
