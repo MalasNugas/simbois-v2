@@ -22,6 +22,7 @@ export default function KlienDashboard() {
   const [pkName, setPkName] = useState<string | null>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editForm, setEditForm] = useState({ full_name: '', gender: '', phone: '', address: '' });
+  const [savingEmployment, setSavingEmployment] = useState(false);
 
   useEffect(() => {
     if (!user) return;
