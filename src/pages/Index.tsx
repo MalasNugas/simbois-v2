@@ -95,7 +95,7 @@ export default function Index() {
             className="text-center mb-12">
             
             <motion.h2 variants={fadeUp} custom={0} className="text-3xl font-bold mb-2">Statistik Platform</motion.h2>
-            <motion.p variants={fadeUp} custom={1} className="text-muted-foreground">Data pencapaian SIMBOS Bapas Malang</motion.p>
+            <motion.p variants={fadeUp} custom={1} className="text-muted-foreground">Data pencapaian SIMBOIS BAPAS KELAS I MALANG </motion.p>
           </motion.div>
           <div className="grid md:grid-cols-3 gap-8 max-w-3xl mx-auto">
             {stats.map((s, i) =>
