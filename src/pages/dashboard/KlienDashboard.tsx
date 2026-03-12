@@ -22,6 +22,7 @@ export default function KlienDashboard() {
   const [pkName, setPkName] = useState<string | null>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editForm, setEditForm] = useState({ full_name: '', gender: '', phone: '', address: '' });
+  const [savingEmployment, setSavingEmployment] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -60,6 +61,15 @@ export default function KlienDashboard() {
     if (error) { toast.error(error.message); return; }
     toast.success('Profil berhasil diperbarui');
     setEditDialogOpen(false);
+    loadData();
+  };
+
+  const updateEmploymentStatus = async (status: string) => {
+    setSavingEmployment(true);
+    const { error } = await supabase.from('clients').update({ employment_status: status as any }).eq('user_id', user!.id);
+    setSavingEmployment(false);
+    if (error) { toast.error(error.message); return; }
+    toast.success('Status pekerjaan berhasil diperbarui');
     loadData();
   };
 
@@ -138,9 +148,19 @@ export default function KlienDashboard() {
               <Briefcase className="w-5 h-5 text-primary" />
               <h2 className="font-semibold">Status</h2>
             </div>
-            <div className="space-y-2 text-sm">
+            <div className="space-y-3 text-sm">
               <p><span className="text-muted-foreground">Bimbingan:</span> <Badge variant="outline" className="capitalize">{client?.guidance_status || '-'}</Badge></p>
-              <p><span className="text-muted-foreground">Pekerjaan:</span> {employmentLabel[client?.employment_status] || '-'}</p>
+              <div>
+                <Label className="text-muted-foreground text-xs">Status Pekerjaan</Label>
+                <Select value={client?.employment_status || ''} onValueChange={updateEmploymentStatus} disabled={savingEmployment}>
+                  <SelectTrigger className="mt-1"><SelectValue placeholder="Pilih status pekerjaan" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="belum_bekerja">Belum Bekerja</SelectItem>
+                    <SelectItem value="sedang_pelatihan">Sedang Pelatihan</SelectItem>
+                    <SelectItem value="sudah_bekerja">Sudah Bekerja</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
               <p><span className="text-muted-foreground">No. Kasus:</span> {client?.case_number || '-'}</p>
               {client?.referred_to_disnaker && <p className="text-primary text-xs">✓ Telah dirujuk ke Disnaker</p>}
             </div>
