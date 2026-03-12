@@ -42,7 +42,6 @@ export default function ClientMapView() {
   }, []);
 
   const loadLocations = async () => {
-    // Get latest location per user using a simple approach
     const { data } = await supabase
       .from('location_tracking')
       .select('user_id, latitude, longitude, tracked_at')
@@ -54,7 +53,21 @@ export default function ClientMapView() {
       data.forEach(d => {
         if (!latestByUser.has(d.user_id)) latestByUser.set(d.user_id, d);
       });
-      setLocations(Array.from(latestByUser.values()));
+
+      // Fetch profile names
+      const userIds = Array.from(latestByUser.keys());
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('user_id, full_name')
+        .in('user_id', userIds);
+
+      const nameMap = new Map(profiles?.map(p => [p.user_id, p.full_name]) || []);
+      const locationsWithNames = Array.from(latestByUser.values()).map(loc => ({
+        ...loc,
+        profile_name: nameMap.get(loc.user_id) || loc.user_id.slice(0, 8) + '...',
+      }));
+
+      setLocations(locationsWithNames);
     }
   };
 
@@ -72,7 +85,7 @@ export default function ClientMapView() {
           <Marker key={`${loc.user_id}-${i}`} position={[loc.latitude, loc.longitude]}>
             <Popup>
               <div className="text-xs">
-                <p className="font-semibold">Klien: {loc.user_id.slice(0, 8)}...</p>
+                <p className="font-semibold">Klien: {loc.profile_name || loc.user_id.slice(0, 8)}</p>
                 <p>Lat: {loc.latitude.toFixed(6)}</p>
                 <p>Lng: {loc.longitude.toFixed(6)}</p>
                 <p>Waktu: {new Date(loc.tracked_at).toLocaleString('id-ID')}</p>
