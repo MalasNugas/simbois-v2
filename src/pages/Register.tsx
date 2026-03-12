@@ -27,8 +27,8 @@ export default function Register() {
       password,
       options: {
         data: { full_name: fullName },
-        emailRedirectTo: window.location.origin,
-      },
+        emailRedirectTo: window.location.origin
+      }
     });
     if (error) {
       toast.error(error.message);
@@ -59,22 +59,22 @@ export default function Register() {
       <div className="glass-card rounded-2xl p-8 w-full max-w-md glow-gold">
         <div className="text-center mb-8">
           <div className="w-12 h-12 rounded-full gradient-gold flex items-center justify-center font-bold text-primary-foreground mx-auto mb-4">SM</div>
-          <h1 className="text-2xl font-bold">Daftar Akun SIMBOS</h1>
+          <h1 className="text-2xl font-bold">Daftar Akun SIMBOIS</h1>
           <p className="text-sm text-muted-foreground mt-1">Buat akun baru untuk memulai</p>
         </div>
 
         <form onSubmit={handleRegister} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="fullName">Nama Lengkap</Label>
-            <Input id="fullName" value={fullName} onChange={e => setFullName(e.target.value)} placeholder="Nama lengkap" required />
+            <Input id="fullName" value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Nama lengkap" required />
           </div>
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
-            <Input id="email" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="email@contoh.com" required />
+            <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="email@contoh.com" required />
           </div>
           <div className="space-y-2">
             <Label htmlFor="password">Kata Sandi</Label>
-            <Input id="password" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Minimal 6 karakter" required />
+            <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Minimal 6 karakter" required />
           </div>
           <div className="space-y-2">
             <Label>Daftar Sebagai</Label>
@@ -83,18 +83,18 @@ export default function Register() {
                 type="button"
                 onClick={() => setRole('klien')}
                 className={`p-3 rounded-xl border text-center text-sm font-medium transition-all ${
-                  role === 'klien' ? 'border-primary bg-primary/10 text-primary' : 'border-border bg-secondary/30 text-muted-foreground hover:bg-secondary/50'
-                }`}
-              >
+                role === 'klien' ? 'border-primary bg-primary/10 text-primary' : 'border-border bg-secondary/30 text-muted-foreground hover:bg-secondary/50'}`
+                }>
+                
                 Klien
               </button>
               <button
                 type="button"
                 onClick={() => setRole('pegawai')}
                 className={`p-3 rounded-xl border text-center text-sm font-medium transition-all ${
-                  role === 'pegawai' ? 'border-primary bg-primary/10 text-primary' : 'border-border bg-secondary/30 text-muted-foreground hover:bg-secondary/50'
-                }`}
-              >
+                role === 'pegawai' ? 'border-primary bg-primary/10 text-primary' : 'border-border bg-secondary/30 text-muted-foreground hover:bg-secondary/50'}`
+                }>
+                
                 Pegawai PK
               </button>
             </div>
@@ -109,6 +109,6 @@ export default function Register() {
           <Link to="/login" className="text-primary hover:underline">Masuk</Link>
         </p>
       </div>
-    </div>
-  );
+    </div>);
+
 }
