@@ -24,7 +24,7 @@ export default function Navbar() {
             SM
           </div>
           <span className="font-bold text-lg text-foreground">
-            SIMBOS <span className="text-primary text-sm font-medium hidden sm:inline">Bapas Malang</span>
+            SIMBOIS <span className="text-primary text-sm font-medium hidden sm:inline">BAPAS KELAS I MALANG</span>
           </span>
         </Link>
 
