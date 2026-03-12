@@ -152,9 +152,9 @@ export default function Index() {
       <section className="py-20 bg-secondary/20">
         <div className="container mx-auto px-4 max-w-4xl">
           <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} className="glass-card rounded-2xl p-8 md:p-12">
-            <motion.h2 variants={fadeUp} custom={0} className="text-3xl font-bold mb-4 text-gradient-gold">Tentang SIMBOS</motion.h2>
+            <motion.h2 variants={fadeUp} custom={0} className="text-3xl font-bold mb-4 text-gradient-gold">Tentang SIMBOIS</motion.h2>
             <motion.p variants={fadeUp} custom={1} className="text-muted-foreground mb-6 leading-relaxed">
-              <strong className="text-foreground">SIMBOS (Sistem Informasi Monitoring dan Bimbingan Online)</strong> adalah inovasi digital dari Balai Pemasyarakatan Malang untuk mendukung proses pembimbingan klien pemasyarakatan berbasis teknologi informasi. Platform ini dirancang untuk memfasilitasi pembimbingan yang lebih terukur, terpantau, dan berkelanjutan.
+              <strong className="text-foreground">SIMBOIS (Sistem Informasi Monitoring dan Bimbingan Online Integrasi Sosial)</strong> adalah inovasi digital dari Balai Pemasyarakatan Malang untuk mendukung proses pembimbingan klien pemasyarakatan berbasis teknologi informasi. Platform ini dirancang untuk memfasilitasi pembimbingan yang lebih terukur, terpantau, dan berkelanjutan.
             </motion.p>
             <motion.blockquote variants={fadeUp} custom={2} className="border-l-4 border-primary pl-4 italic text-muted-foreground">
               "Bukan tentang kontrol, tetapi koneksi. Bukan tentang hukuman, tetapi harapan. Kami percaya bahwa setiap manusia berhak untuk bertumbuh dan memulai kembali."
