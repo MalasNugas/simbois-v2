@@ -36,18 +36,19 @@ export default function Login() {
       <div className="glass-card rounded-2xl p-8 w-full max-w-md glow-gold">
         <div className="text-center mb-8">
           <div className="w-12 h-12 rounded-full gradient-gold flex items-center justify-center font-bold text-primary-foreground mx-auto mb-4">SM</div>
-          <h1 className="text-2xl font-bold">Masuk ke SIMBOS</h1>
-          <p className="text-sm text-muted-foreground mt-1">Sistem Informasi Monitoring & Bimbingan Online</p>
+          <h1 className="text-2xl font-bold">Masuk ke SIMBOIS</h1>
+          <p className="text-sm text-muted-foreground mt-1 px-[13px]">Sistem Informasi Monitoring & Bimbingan Online Integrasi Sosial 
+          </p>
         </div>
 
         <form onSubmit={handleLogin} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
-            <Input id="email" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="email@contoh.com" required />
+            <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="email@contoh.com" required />
           </div>
           <div className="space-y-2">
             <Label htmlFor="password">Kata Sandi</Label>
-            <Input id="password" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" required />
+            <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" required />
           </div>
           <Button type="submit" className="w-full gap-2" disabled={loading}>
             <LogIn className="w-4 h-4" /> {loading ? 'Memproses...' : 'Masuk'}
@@ -59,6 +60,5 @@ export default function Login() {
           <Link to="/register" className="text-primary hover:underline">Daftar sekarang</Link>
         </p>
       </div>
-    </div>
-  );
+    </div>);
 }
