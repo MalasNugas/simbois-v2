@@ -412,6 +412,9 @@ export default function PegawaiDashboard() {
                 <thead>
                   <tr className="border-b border-border text-left">
                     <th className="pb-3 text-muted-foreground font-medium">Nama</th>
+                    <th className="pb-3 text-muted-foreground font-medium">Jenis Kelamin</th>
+                    <th className="pb-3 text-muted-foreground font-medium">Alamat</th>
+                    <th className="pb-3 text-muted-foreground font-medium">No. Telepon</th>
                     <th className="pb-3 text-muted-foreground font-medium">No. Kasus</th>
                     <th className="pb-3 text-muted-foreground font-medium">Bimbingan</th>
                     <th className="pb-3 text-muted-foreground font-medium">Pekerjaan</th>
