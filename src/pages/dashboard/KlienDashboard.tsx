@@ -64,6 +64,15 @@ export default function KlienDashboard() {
     loadData();
   };
 
+  const updateEmploymentStatus = async (status: string) => {
+    setSavingEmployment(true);
+    const { error } = await supabase.from('clients').update({ employment_status: status as any }).eq('user_id', user!.id);
+    setSavingEmployment(false);
+    if (error) { toast.error(error.message); return; }
+    toast.success('Status pekerjaan berhasil diperbarui');
+    loadData();
+  };
+
   const registerProgram = async (programId: string) => {
     const { error } = await supabase.from('program_registrations').insert({ program_id: programId, client_id: user!.id });
     if (error) {
