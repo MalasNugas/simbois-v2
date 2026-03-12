@@ -412,6 +412,9 @@ export default function PegawaiDashboard() {
                 <thead>
                   <tr className="border-b border-border text-left">
                     <th className="pb-3 text-muted-foreground font-medium">Nama</th>
+                    <th className="pb-3 text-muted-foreground font-medium">Jenis Kelamin</th>
+                    <th className="pb-3 text-muted-foreground font-medium">Alamat</th>
+                    <th className="pb-3 text-muted-foreground font-medium">No. Telepon</th>
                     <th className="pb-3 text-muted-foreground font-medium">No. Kasus</th>
                     <th className="pb-3 text-muted-foreground font-medium">Bimbingan</th>
                     <th className="pb-3 text-muted-foreground font-medium">Pekerjaan</th>
@@ -424,6 +427,9 @@ export default function PegawaiDashboard() {
                   {displayedClients.map(c => (
                     <tr key={c.id} className="border-b border-border/50">
                       <td className="py-3">{(c as any).profile?.full_name || '-'}</td>
+                      <td className="py-3 capitalize">{(c as any).profile?.gender || '-'}</td>
+                      <td className="py-3 max-w-[200px] truncate" title={(c as any).profile?.address || ''}>{(c as any).profile?.address || '-'}</td>
+                      <td className="py-3">{(c as any).profile?.phone || '-'}</td>
                       <td className="py-3">{c.case_number || '-'}</td>
                       <td className="py-3"><Badge variant="outline" className="capitalize">{c.guidance_status}</Badge></td>
                       <td className="py-3 capitalize">{c.employment_status?.replace('_', ' ')}</td>
