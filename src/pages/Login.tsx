@@ -22,7 +22,8 @@ export default function Login() {
       toast.error(error.message);
     } else {
       // Role will be fetched by AuthProvider, redirect based on role
-      const { data } = await supabase.from('user_roles').select('role').maybeSingle();
+      const { data: { user } } = await supabase.auth.getUser();
+      const { data } = await supabase.from('user_roles').select('role').eq('user_id', user!.id).maybeSingle();
       if (data?.role === 'pegawai') {
         navigate('/dashboard/pegawai');
       } else {
