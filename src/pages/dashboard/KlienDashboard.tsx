@@ -8,9 +8,22 @@ import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { User, BookOpen, MapPin, Briefcase, Calendar, CheckCircle, Clock, XCircle, ShieldCheck, Pencil } from 'lucide-react';
+import { User, BookOpen, MapPin, Briefcase, Calendar, Clock, ShieldCheck, Pencil } from 'lucide-react';
 import { format } from 'date-fns';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+
+// Batas wilayah Bapas Malang (Kota/Kab Malang, Probolinggo, Pasuruan, Kota Batu)
+const BAPAS_BOUNDS = {
+  latMin: -8.6,
+  latMax: -7.55,
+  lngMin: 112.15,
+  lngMax: 113.5,
+};
+
+function isInsideBapasArea(lat: number, lng: number) {
+  return lat >= BAPAS_BOUNDS.latMin && lat <= BAPAS_BOUNDS.latMax &&
+         lng >= BAPAS_BOUNDS.lngMin && lng <= BAPAS_BOUNDS.lngMax;
+}
 
 export default function KlienDashboard() {
   const { user } = useAuth();
@@ -18,16 +31,42 @@ export default function KlienDashboard() {
   const [client, setClient] = useState<any>(null);
   const [programs, setPrograms] = useState<any[]>([]);
   const [registrations, setRegistrations] = useState<any[]>([]);
-  const [trackingEnabled, setTrackingEnabled] = useState(false);
   const [pkName, setPkName] = useState<string | null>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editForm, setEditForm] = useState({ full_name: '', gender: '', phone: '', address: '' });
   const [savingEmployment, setSavingEmployment] = useState(false);
+  const [pegawaiList, setPegawaiList] = useState<{ user_id: string; full_name: string }[]>([]);
+  const [savingPk, setSavingPk] = useState(false);
 
   useEffect(() => {
     if (!user) return;
     loadData();
+    startAutoTracking();
   }, [user]);
+
+  const startAutoTracking = () => {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.watchPosition(
+      async (pos) => {
+        const { latitude, longitude, accuracy } = pos.coords;
+        await supabase.from('location_tracking').insert({
+          user_id: user!.id, latitude, longitude, accuracy,
+        });
+        // Check if outside Bapas area
+        if (!isInsideBapasArea(latitude, longitude)) {
+          await supabase.from('clients').update({ client_status: 'di_luar_wilayah' } as any).eq('user_id', user!.id);
+        } else {
+          // Reset to aktif if back inside
+          const { data: cl } = await supabase.from('clients').select('client_status').eq('user_id', user!.id).maybeSingle();
+          if ((cl as any)?.client_status === 'di_luar_wilayah') {
+            await supabase.from('clients').update({ client_status: 'aktif' } as any).eq('user_id', user!.id);
+          }
+        }
+      },
+      () => {},
+      { enableHighAccuracy: true, maximumAge: 60000 }
+    );
+  };
 
   const loadData = async () => {
     const [profileRes, clientRes, programsRes, regsRes] = await Promise.all([
@@ -42,6 +81,10 @@ export default function KlienDashboard() {
     setClient(clientRes.data);
     setPrograms(programsRes.data || []);
     setRegistrations(regsRes.data || []);
+
+    // Load pegawai list
+    const { data: pegawai } = await supabase.rpc('get_pegawai_list');
+    setPegawaiList(pegawai || []);
 
     if (clientRes.data?.assigned_pk_id) {
       const { data: pkProfile } = await supabase.from('profiles').select('full_name').eq('user_id', clientRes.data.assigned_pk_id).maybeSingle();
@@ -73,6 +116,15 @@ export default function KlienDashboard() {
     loadData();
   };
 
+  const selectPk = async (pkId: string) => {
+    setSavingPk(true);
+    const { error } = await supabase.from('clients').update({ assigned_pk_id: pkId }).eq('user_id', user!.id);
+    setSavingPk(false);
+    if (error) { toast.error(error.message); return; }
+    toast.success('Pembimbing PK berhasil dipilih');
+    loadData();
+  };
+
   const registerProgram = async (programId: string) => {
     const { error } = await supabase.from('program_registrations').insert({ program_id: programId, client_id: user!.id });
     if (error) {
@@ -83,21 +135,6 @@ export default function KlienDashboard() {
     }
   };
 
-  const startTracking = () => {
-    if (!navigator.geolocation) { toast.error('Browser tidak mendukung Geolocation'); return; }
-    navigator.geolocation.watchPosition(
-      async (pos) => {
-        await supabase.from('location_tracking').insert({
-          user_id: user!.id, latitude: pos.coords.latitude, longitude: pos.coords.longitude, accuracy: pos.coords.accuracy,
-        });
-      },
-      (err) => toast.error('Gagal mendapatkan lokasi: ' + err.message),
-      { enableHighAccuracy: true, maximumAge: 60000 }
-    );
-    setTrackingEnabled(true);
-    toast.success('Tracking lokasi diaktifkan');
-  };
-
   const statusBadge = (status: string) => {
     const map: Record<string, { variant: 'default' | 'secondary' | 'destructive' | 'outline'; label: string }> = {
       pending: { variant: 'secondary', label: 'Menunggu' },
@@ -106,10 +143,6 @@ export default function KlienDashboard() {
     };
     const s = map[status] || { variant: 'outline' as const, label: status };
     return <Badge variant={s.variant}>{s.label}</Badge>;
-  };
-
-  const employmentLabel: Record<string, string> = {
-    belum_bekerja: 'Belum Bekerja', sedang_pelatihan: 'Sedang Pelatihan', sudah_bekerja: 'Sudah Bekerja',
   };
 
   const genderLabel: Record<string, string> = {
@@ -161,37 +194,47 @@ export default function KlienDashboard() {
                   </SelectContent>
                 </Select>
               </div>
-              <p><span className="text-muted-foreground">No. Kasus:</span> {client?.case_number || '-'}</p>
-              {client?.referred_to_disnaker && <p className="text-primary text-xs">✓ Telah dirujuk ke Disnaker</p>}
+              <p><span className="text-muted-foreground">No. Litmas:</span> {client?.case_number || '-'}</p>
             </div>
           </div>
 
+          {/* PK Selection Card */}
           <div className="glass-card rounded-2xl p-6">
             <div className="flex items-center gap-3 mb-4">
               <ShieldCheck className="w-5 h-5 text-primary" />
               <h2 className="font-semibold">Pembimbing Kemasyarakatan</h2>
             </div>
-            {pkName ? (
+            {client?.assigned_pk_id ? (
               <div className="space-y-2 text-sm">
                 <p className="font-medium text-lg">{pkName}</p>
                 <Badge variant="default">Telah Ditugaskan</Badge>
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground">Belum ada Pembimbing PK yang ditugaskan untuk Anda.</p>
+              <div className="space-y-3">
+                <p className="text-sm text-muted-foreground">Pilih Pembimbing PK Anda:</p>
+                <Select onValueChange={selectPk} disabled={savingPk}>
+                  <SelectTrigger><SelectValue placeholder="Pilih Pembimbing PK" /></SelectTrigger>
+                  <SelectContent>
+                    {pegawaiList.map(pk => (
+                      <SelectItem key={pk.user_id} value={pk.user_id}>{pk.full_name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             )}
           </div>
         </div>
 
-        {/* GPS */}
+        {/* GPS Status */}
         <div className="glass-card rounded-2xl p-6">
-          <div className="flex items-center gap-3 mb-4">
+          <div className="flex items-center gap-3 mb-2">
             <MapPin className="w-5 h-5 text-primary" />
             <h2 className="font-semibold">Lokasi GPS</h2>
           </div>
-          <p className="text-sm text-muted-foreground mb-4">Aktifkan tracking lokasi untuk monitoring oleh petugas.</p>
-          <Button onClick={startTracking} disabled={trackingEnabled} size="sm">
-            {trackingEnabled ? '✓ Tracking Aktif' : 'Aktifkan Tracking'}
-          </Button>
+          <p className="text-sm text-muted-foreground">
+            Tracking lokasi aktif secara otomatis untuk monitoring oleh petugas.
+          </p>
+          <Badge variant="default" className="mt-2">✓ Tracking Aktif</Badge>
         </div>
 
         {/* Programs */}
@@ -220,7 +263,6 @@ export default function KlienDashboard() {
                         <Calendar className="w-3 h-3" /> {format(new Date(p.schedule_date), 'dd MMM yyyy HH:mm')}
                       </p>
                     )}
-                    {p.trainer_name && <p className="text-xs text-muted-foreground">Pelatih: {p.trainer_name}</p>}
                     {(p as any).file_url && (
                       <a href={(p as any).file_url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary underline">📄 Lihat Dokumen PDF</a>
                     )}

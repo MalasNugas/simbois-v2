@@ -18,6 +18,7 @@ export type Database = {
         Row: {
           assigned_pk_id: string | null
           case_number: string | null
+          client_status: string | null
           created_at: string | null
           employment_details: string | null
           employment_status:
@@ -33,6 +34,7 @@ export type Database = {
         Insert: {
           assigned_pk_id?: string | null
           case_number?: string | null
+          client_status?: string | null
           created_at?: string | null
           employment_details?: string | null
           employment_status?:
@@ -50,6 +52,7 @@ export type Database = {
         Update: {
           assigned_pk_id?: string | null
           case_number?: string | null
+          client_status?: string | null
           created_at?: string | null
           employment_details?: string | null
           employment_status?:
@@ -244,6 +247,13 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_pegawai_list: {
+        Args: never
+        Returns: {
+          full_name: string
+          user_id: string
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
