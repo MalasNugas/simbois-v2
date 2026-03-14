@@ -77,7 +77,7 @@ export default function KlienDashboard() {
     ]);
     const p = profileRes.data;
     setProfile(p);
-    if (p) setEditForm({ full_name: p.full_name || '', gender: (p as any).gender || '', phone: p.phone || '', address: p.address || '' });
+    if (p) setEditForm({ full_name: p.full_name || '', gender: (p as any).gender || '', phone: p.phone || '', address: p.address || '', case_number: (clientRes.data as any)?.case_number || '' });
     setClient(clientRes.data);
     setPrograms(programsRes.data || []);
     setRegistrations(regsRes.data || []);
