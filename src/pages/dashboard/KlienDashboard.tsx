@@ -102,6 +102,10 @@ export default function KlienDashboard() {
       address: editForm.address || null,
     } as any).eq('user_id', user!.id);
     if (error) { toast.error(error.message); return; }
+    // Save case_number to clients table
+    if (editForm.case_number !== undefined) {
+      await supabase.from('clients').update({ case_number: editForm.case_number || null }).eq('user_id', user!.id);
+    }
     toast.success('Profil berhasil diperbarui');
     setEditDialogOpen(false);
     loadData();
