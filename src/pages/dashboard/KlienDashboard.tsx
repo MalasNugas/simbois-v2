@@ -33,7 +33,7 @@ export default function KlienDashboard() {
   const [registrations, setRegistrations] = useState<any[]>([]);
   const [pkName, setPkName] = useState<string | null>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [editForm, setEditForm] = useState({ full_name: '', gender: '', phone: '', address: '' });
+  const [editForm, setEditForm] = useState({ full_name: '', gender: '', phone: '', address: '', case_number: '' });
   const [savingEmployment, setSavingEmployment] = useState(false);
   const [pegawaiList, setPegawaiList] = useState<{ user_id: string; full_name: string }[]>([]);
   const [savingPk, setSavingPk] = useState(false);
