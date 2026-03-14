@@ -33,7 +33,7 @@ export default function KlienDashboard() {
   const [registrations, setRegistrations] = useState<any[]>([]);
   const [pkName, setPkName] = useState<string | null>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [editForm, setEditForm] = useState({ full_name: '', gender: '', phone: '', address: '' });
+  const [editForm, setEditForm] = useState({ full_name: '', gender: '', phone: '', address: '', case_number: '' });
   const [savingEmployment, setSavingEmployment] = useState(false);
   const [pegawaiList, setPegawaiList] = useState<{ user_id: string; full_name: string }[]>([]);
   const [savingPk, setSavingPk] = useState(false);
@@ -77,7 +77,7 @@ export default function KlienDashboard() {
     ]);
     const p = profileRes.data;
     setProfile(p);
-    if (p) setEditForm({ full_name: p.full_name || '', gender: (p as any).gender || '', phone: p.phone || '', address: p.address || '' });
+    if (p) setEditForm({ full_name: p.full_name || '', gender: (p as any).gender || '', phone: p.phone || '', address: p.address || '', case_number: (clientRes.data as any)?.case_number || '' });
     setClient(clientRes.data);
     setPrograms(programsRes.data || []);
     setRegistrations(regsRes.data || []);
@@ -102,6 +102,10 @@ export default function KlienDashboard() {
       address: editForm.address || null,
     } as any).eq('user_id', user!.id);
     if (error) { toast.error(error.message); return; }
+    // Save case_number to clients table
+    if (editForm.case_number !== undefined) {
+      await supabase.from('clients').update({ case_number: editForm.case_number || null }).eq('user_id', user!.id);
+    }
     toast.success('Profil berhasil diperbarui');
     setEditDialogOpen(false);
     loadData();
@@ -324,6 +328,10 @@ export default function KlienDashboard() {
               <div className="space-y-2">
                 <Label>Alamat</Label>
                 <Textarea value={editForm.address} onChange={e => setEditForm(f => ({ ...f, address: e.target.value }))} placeholder="Masukkan alamat lengkap" />
+              </div>
+              <div className="space-y-2">
+                <Label>No. Litmas</Label>
+                <Input value={editForm.case_number} onChange={e => setEditForm(f => ({ ...f, case_number: e.target.value }))} placeholder="Masukkan No. Litmas" />
               </div>
               <Button onClick={saveProfile} className="w-full">Simpan Profil</Button>
             </div>
