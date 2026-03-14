@@ -325,6 +325,10 @@ export default function KlienDashboard() {
                 <Label>Alamat</Label>
                 <Textarea value={editForm.address} onChange={e => setEditForm(f => ({ ...f, address: e.target.value }))} placeholder="Masukkan alamat lengkap" />
               </div>
+              <div className="space-y-2">
+                <Label>No. Litmas</Label>
+                <Input value={editForm.case_number} onChange={e => setEditForm(f => ({ ...f, case_number: e.target.value }))} placeholder="Masukkan No. Litmas" />
+              </div>
               <Button onClick={saveProfile} className="w-full">Simpan Profil</Button>
             </div>
           </DialogContent>
