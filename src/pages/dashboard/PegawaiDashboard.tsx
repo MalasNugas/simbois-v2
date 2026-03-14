@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
-import { Users, BookOpen, Briefcase, MapPin, Plus, CheckCircle, XCircle, UserPlus, Filter, Search, Pencil, Trash2, FileUp, FileText } from 'lucide-react';
+import { Users, BookOpen, Briefcase, MapPin, Plus, CheckCircle, XCircle, Filter, Search, Pencil, Trash2, FileText } from 'lucide-react';
 import { format } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -23,11 +23,9 @@ export default function PegawaiDashboard() {
   const [showOnlyMyClients, setShowOnlyMyClients] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [newProgram, setNewProgram] = useState({
-    name: '', description: '', program_type: 'kepribadian', quota: 20, trainer_name: '', schedule_date: '',
+    name: '', description: '', program_type: 'kepribadian', quota: 20, schedule_date: '',
   });
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [assignDialogOpen, setAssignDialogOpen] = useState(false);
-  const [unassignedClients, setUnassignedClients] = useState<any[]>([]);
   const [editingProgram, setEditingProgram] = useState<any>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -89,6 +87,18 @@ export default function PegawaiDashboard() {
       return name.includes(q) || caseNum.includes(q);
     });
 
+  const clientStatusLabel: Record<string, string> = {
+    aktif: 'Aktif',
+    meninggal: 'Meninggal',
+    di_luar_wilayah: 'Di Luar Wilayah',
+  };
+
+  const clientStatusVariant: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
+    aktif: 'default',
+    meninggal: 'destructive',
+    di_luar_wilayah: 'secondary',
+  };
+
   const stats = {
     total: displayedClients.length,
     aktifBimbingan: displayedClients.filter(c => c.guidance_status === 'aktif').length,
@@ -96,24 +106,10 @@ export default function PegawaiDashboard() {
     belumBekerja: displayedClients.filter(c => c.employment_status === 'belum_bekerja').length,
   };
 
-  const openAssignDialog = () => {
-    setUnassignedClients(clients.filter(c => !c.assigned_pk_id));
-    setAssignDialogOpen(true);
-  };
-
-  const assignClient = async (clientId: string) => {
-    const { error } = await supabase.from('clients').update({ assigned_pk_id: user!.id }).eq('id', clientId);
-    if (error) { toast.error(error.message); return; }
-    toast.success('Klien berhasil di-assign');
-    loadData();
-    setUnassignedClients(prev => prev.filter(c => c.id !== clientId));
-  };
-
-  const unassignClient = async (clientId: string) => {
-    const { error } = await supabase.from('clients').update({ assigned_pk_id: null }).eq('id', clientId);
-    if (error) { toast.error(error.message); return; }
-    toast.success('Klien berhasil di-unassign');
-    loadData();
+  const updateClientStatus = async (userId: string, status: string) => {
+    const { error } = await supabase.from('clients').update({ client_status: status } as any).eq('user_id', userId);
+    if (error) toast.error(error.message);
+    else { toast.success('Status klien diperbarui'); loadData(); }
   };
 
   const createProgram = async () => {
@@ -136,7 +132,7 @@ export default function PegawaiDashboard() {
     if (error) { toast.error(error.message); return; }
     toast.success('Program berhasil dibuat');
     setDialogOpen(false);
-    setNewProgram({ name: '', description: '', program_type: 'kepribadian', quota: 20, trainer_name: '', schedule_date: '' });
+    setNewProgram({ name: '', description: '', program_type: 'kepribadian', quota: 20, schedule_date: '' });
     if (fileInputRef.current) fileInputRef.current.value = '';
     loadData();
   };
@@ -164,7 +160,6 @@ export default function PegawaiDashboard() {
       description: editingProgram.description,
       program_type: editingProgram.program_type,
       quota: Number(editingProgram.quota),
-      trainer_name: editingProgram.trainer_name,
       schedule_date: editingProgram.schedule_date || null,
       is_open: editingProgram.is_open,
       file_url: fileUrl,
@@ -206,12 +201,6 @@ export default function PegawaiDashboard() {
     else { toast.success('Klien berhasil diverifikasi'); loadData(); }
   };
 
-  const referToDisnaker = async (userId: string) => {
-    const { error } = await supabase.from('clients').update({ referred_to_disnaker: true }).eq('user_id', userId);
-    if (error) toast.error(error.message);
-    else { toast.success('Klien dirujuk ke Disnaker'); loadData(); }
-  };
-
   const programForm = (values: any, onChange: (v: any) => void, inputRef?: React.RefObject<HTMLInputElement>) => (
     <div className="space-y-4">
       <div className="space-y-2">
@@ -243,10 +232,6 @@ export default function PegawaiDashboard() {
         <Input type="datetime-local" value={values.schedule_date || ''} onChange={e => onChange({ ...values, schedule_date: e.target.value })} />
       </div>
       <div className="space-y-2">
-        <Label>Nama Pelatih (opsional)</Label>
-        <Input value={values.trainer_name || ''} onChange={e => onChange({ ...values, trainer_name: e.target.value })} />
-      </div>
-      <div className="space-y-2">
         <Label>File PDF (opsional)</Label>
         <div className="flex items-center gap-2">
           <Input type="file" accept=".pdf" ref={inputRef as any} className="file:mr-2 file:py-1 file:px-3 file:rounded file:border-0 file:text-sm file:bg-primary file:text-primary-foreground" />
@@ -268,9 +253,6 @@ export default function PegawaiDashboard() {
           <div className="flex gap-2 flex-wrap">
             <Button variant="outline" onClick={() => setShowMap(!showMap)}>
               <MapPin className="w-4 h-4 mr-2" /> {showMap ? 'Tutup Peta' : 'Monitoring Lokasi'}
-            </Button>
-            <Button variant="outline" onClick={openAssignDialog}>
-              <UserPlus className="w-4 h-4 mr-2" /> Assign Klien
             </Button>
             <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
               <DialogTrigger asChild>
@@ -299,7 +281,7 @@ export default function PegawaiDashboard() {
           </div>
           <div className="relative w-full sm:w-72">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input placeholder="Cari nama atau no. kasus..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-9" />
+            <Input placeholder="Cari nama atau no. litmas..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-9" />
           </div>
         </div>
 
@@ -342,7 +324,7 @@ export default function PegawaiDashboard() {
                   </div>
                   <Badge variant="outline" className="capitalize">{p.program_type}</Badge>
                   <p className="text-sm text-muted-foreground">{p.description}</p>
-                  <p className="text-xs text-muted-foreground">Kuota: {p.quota} {p.trainer_name && `• Pelatih: ${p.trainer_name}`}</p>
+                  <p className="text-xs text-muted-foreground">Kuota: {p.quota}</p>
                   {p.schedule_date && (
                     <p className="text-xs text-muted-foreground">Jadwal: {format(new Date(p.schedule_date), 'dd MMM yyyy HH:mm')}</p>
                   )}
@@ -405,7 +387,7 @@ export default function PegawaiDashboard() {
           <h2 className="text-xl font-bold mb-4">Data Klien</h2>
           {displayedClients.length === 0 ? (
             <p className="text-muted-foreground text-sm">
-              {searchQuery ? 'Tidak ditemukan klien dengan pencarian tersebut.' : showOnlyMyClients ? 'Belum ada klien yang di-assign ke Anda.' : 'Belum ada data klien.'}
+              {searchQuery ? 'Tidak ditemukan klien dengan pencarian tersebut.' : showOnlyMyClients ? 'Belum ada klien yang memilih Anda sebagai PK.' : 'Belum ada data klien.'}
             </p>
           ) : (
             <div className="overflow-x-auto">
@@ -416,11 +398,11 @@ export default function PegawaiDashboard() {
                     <th className="pb-3 text-muted-foreground font-medium">Jenis Kelamin</th>
                     <th className="pb-3 text-muted-foreground font-medium">Alamat</th>
                     <th className="pb-3 text-muted-foreground font-medium">No. Telepon</th>
-                    <th className="pb-3 text-muted-foreground font-medium">No. Kasus</th>
+                    <th className="pb-3 text-muted-foreground font-medium">No. Litmas</th>
                     <th className="pb-3 text-muted-foreground font-medium">Bimbingan</th>
                     <th className="pb-3 text-muted-foreground font-medium">Pekerjaan</th>
+                    <th className="pb-3 text-muted-foreground font-medium">Status Klien</th>
                     <th className="pb-3 text-muted-foreground font-medium">Verifikasi</th>
-                    <th className="pb-3 text-muted-foreground font-medium">PK</th>
                     <th className="pb-3 text-muted-foreground font-medium">Aksi</th>
                   </tr>
                 </thead>
@@ -434,31 +416,23 @@ export default function PegawaiDashboard() {
                       <td className="py-3">{c.case_number || '-'}</td>
                       <td className="py-3"><Badge variant="outline" className="capitalize">{c.guidance_status}</Badge></td>
                       <td className="py-3 capitalize">{c.employment_status?.replace('_', ' ')}</td>
-                      <td className="py-3">{(c as any).profile?.is_verified ? <Badge variant="default">✓</Badge> : <Badge variant="secondary">✗</Badge>}</td>
                       <td className="py-3">
-                        {c.assigned_pk_id === user?.id ? (
-                          <Badge variant="default">Anda</Badge>
-                        ) : c.assigned_pk_id ? (
-                          <Badge variant="secondary">PK Lain</Badge>
-                        ) : (
-                          <Badge variant="outline">Belum</Badge>
-                        )}
+                        <Select value={(c as any).client_status || 'aktif'} onValueChange={v => updateClientStatus(c.user_id, v)}>
+                          <SelectTrigger className="h-8 w-[150px]">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="aktif">Aktif</SelectItem>
+                            <SelectItem value="meninggal">Meninggal</SelectItem>
+                            <SelectItem value="di_luar_wilayah">Di Luar Wilayah</SelectItem>
+                          </SelectContent>
+                        </Select>
                       </td>
+                      <td className="py-3">{(c as any).profile?.is_verified ? <Badge variant="default">✓</Badge> : <Badge variant="secondary">✗</Badge>}</td>
                       <td className="py-3">
                         <div className="flex gap-1 flex-wrap">
                           {!(c as any).profile?.is_verified && (
                             <Button size="sm" variant="outline" onClick={() => verifyClient(c.user_id)}>Verifikasi</Button>
-                          )}
-                          {c.employment_status === 'belum_bekerja' && !c.referred_to_disnaker && (
-                            <Button size="sm" variant="outline" onClick={() => referToDisnaker(c.user_id)}>Rujuk Disnaker</Button>
-                          )}
-                          {c.assigned_pk_id === user?.id && (
-                            <Button size="sm" variant="ghost" className="text-destructive" onClick={() => unassignClient(c.id)}>Lepas</Button>
-                          )}
-                          {!c.assigned_pk_id && (
-                            <Button size="sm" variant="outline" onClick={() => assignClient(c.id)}>
-                              <UserPlus className="w-3 h-3 mr-1" /> Assign
-                            </Button>
                           )}
                         </div>
                       </td>
@@ -469,33 +443,6 @@ export default function PegawaiDashboard() {
             </div>
           )}
         </div>
-
-        {/* Assign Client Dialog */}
-        <Dialog open={assignDialogOpen} onOpenChange={setAssignDialogOpen}>
-          <DialogContent className="bg-card border-border max-h-[80vh] overflow-y-auto">
-            <DialogHeader><DialogTitle>Assign Klien ke Anda</DialogTitle></DialogHeader>
-            {unassignedClients.length === 0 ? (
-              <p className="text-muted-foreground text-sm py-4">Semua klien sudah memiliki PK.</p>
-            ) : (
-              <div className="space-y-3">
-                <p className="text-sm text-muted-foreground">Pilih klien yang belum memiliki Pembimbing Kemasyarakatan:</p>
-                {unassignedClients.map(c => (
-                  <div key={c.id} className="flex items-center justify-between p-3 rounded-lg border border-border">
-                    <div>
-                      <p className="font-medium text-sm">{(c as any).profile?.full_name || 'Tanpa Nama'}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {c.case_number || 'No kasus: -'} • {c.guidance_status} • {c.employment_status?.replace('_', ' ')}
-                      </p>
-                    </div>
-                    <Button size="sm" onClick={() => assignClient(c.id)}>
-                      <UserPlus className="w-3 h-3 mr-1" /> Assign
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </DialogContent>
-        </Dialog>
 
         {/* Edit Program Dialog */}
         <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
