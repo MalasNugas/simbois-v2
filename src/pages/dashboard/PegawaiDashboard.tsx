@@ -7,11 +7,12 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
-import { Users, BookOpen, Briefcase, MapPin, Plus, CheckCircle, XCircle, Filter, Search, Pencil, Trash2, FileText } from 'lucide-react';
+import { Users, BookOpen, Briefcase, MapPin, Plus, CheckCircle, XCircle, Filter, Search, Pencil, Trash2, FileText, Bell, CalendarDays } from 'lucide-react';
 import { format } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import ClientMapView from '@/components/ClientMapView';
 
 export default function PegawaiDashboard() {
@@ -31,16 +32,21 @@ export default function PegawaiDashboard() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [programToDelete, setProgramToDelete] = useState<any>(null);
   const [uploadingPdf, setUploadingPdf] = useState(false);
+  const [guidanceDialogOpen, setGuidanceDialogOpen] = useState(false);
+  const [guidanceClient, setGuidanceClient] = useState<any>(null);
+  const [guidanceForm, setGuidanceForm] = useState({ guidance_start: '', guidance_end: '' });
+  const [monthlyReports, setMonthlyReports] = useState<any[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const editFileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { loadData(); }, []);
 
   const loadData = async () => {
-    const [clientsRes, programsRes, regsRes] = await Promise.all([
+    const [clientsRes, programsRes, regsRes, reportsRes] = await Promise.all([
       supabase.from('clients').select('*').order('created_at', { ascending: false }),
       supabase.from('programs').select('*').order('created_at', { ascending: false }),
       supabase.from('program_registrations').select('*, programs(*)'),
+      supabase.from('monthly_reports' as any).select('*'),
     ]);
 
     const clientsData = clientsRes.data || [];
@@ -62,6 +68,7 @@ export default function PegawaiDashboard() {
     setClients(clientsData);
     setPrograms(programsRes.data || []);
     setRegistrations(regsData);
+    setMonthlyReports((reportsRes.data as any[]) || []);
   };
 
   const uploadPdf = async (file: File): Promise<string | null> => {
@@ -87,16 +94,23 @@ export default function PegawaiDashboard() {
       return name.includes(q) || caseNum.includes(q);
     });
 
-  const clientStatusLabel: Record<string, string> = {
-    aktif: 'Aktif',
-    meninggal: 'Meninggal',
-    di_luar_wilayah: 'Di Luar Wilayah',
-  };
+  // Clients with ended guidance
+  const clientsWithEndedGuidance = displayedClients.filter(c => {
+    if (!c.guidance_end || c.guidance_status !== 'aktif') return false;
+    return new Date(c.guidance_end) <= new Date();
+  });
 
-  const clientStatusVariant: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
-    aktif: 'default',
-    meninggal: 'destructive',
-    di_luar_wilayah: 'secondary',
+  // Current month report check
+  const now = new Date();
+  const currentMonth = now.getMonth() + 1;
+  const currentYear = now.getFullYear();
+  const clientsNotReported = displayedClients.filter(c => {
+    if (c.guidance_status !== 'aktif') return false;
+    return !monthlyReports.some(r => r.client_id === c.user_id && r.report_month === currentMonth && r.report_year === currentYear);
+  });
+
+  const clientStatusLabel: Record<string, string> = {
+    aktif: 'Aktif', meninggal: 'Meninggal', di_luar_wilayah: 'Di Luar Wilayah',
   };
 
   const stats = {
@@ -112,22 +126,43 @@ export default function PegawaiDashboard() {
     else { toast.success('Status klien diperbarui'); loadData(); }
   };
 
+  const openGuidanceDialog = (client: any) => {
+    setGuidanceClient(client);
+    setGuidanceForm({
+      guidance_start: client.guidance_start || '',
+      guidance_end: client.guidance_end || '',
+    });
+    setGuidanceDialogOpen(true);
+  };
+
+  const saveGuidancePeriod = async () => {
+    if (!guidanceClient) return;
+    const { error } = await supabase.from('clients').update({
+      guidance_start: guidanceForm.guidance_start || null,
+      guidance_end: guidanceForm.guidance_end || null,
+    } as any).eq('user_id', guidanceClient.user_id);
+    if (error) { toast.error(error.message); return; }
+    toast.success('Masa bimbingan berhasil diperbarui');
+    setGuidanceDialogOpen(false);
+    loadData();
+  };
+
+  const endGuidance = async (userId: string) => {
+    const { error } = await supabase.from('clients').update({ guidance_status: 'selesai' as any }).eq('user_id', userId);
+    if (error) toast.error(error.message);
+    else { toast.success('Masa bimbingan klien telah diakhiri'); loadData(); }
+  };
+
   const createProgram = async () => {
     if (!newProgram.name.trim()) { toast.error('Nama program wajib diisi'); return; }
-
     let fileUrl: string | null = null;
     if (fileInputRef.current?.files?.[0]) {
       fileUrl = await uploadPdf(fileInputRef.current.files[0]);
       if (fileUrl === null && fileInputRef.current.files[0]) return;
     }
-
     const { error } = await supabase.from('programs').insert({
-      ...newProgram,
-      quota: Number(newProgram.quota),
-      schedule_date: newProgram.schedule_date || null,
-      is_open: true,
-      created_by: user!.id,
-      file_url: fileUrl,
+      ...newProgram, quota: Number(newProgram.quota), schedule_date: newProgram.schedule_date || null,
+      is_open: true, created_by: user!.id, file_url: fileUrl,
     } as any);
     if (error) { toast.error(error.message); return; }
     toast.success('Program berhasil dibuat');
@@ -138,31 +173,22 @@ export default function PegawaiDashboard() {
   };
 
   const openEditProgram = (program: any) => {
-    setEditingProgram({
-      ...program,
-      schedule_date: program.schedule_date ? program.schedule_date.slice(0, 16) : '',
-    });
+    setEditingProgram({ ...program, schedule_date: program.schedule_date ? program.schedule_date.slice(0, 16) : '' });
     setEditDialogOpen(true);
   };
 
   const updateProgram = async () => {
     if (!editingProgram) return;
-
     let fileUrl = editingProgram.file_url;
     if (editFileInputRef.current?.files?.[0]) {
       const url = await uploadPdf(editFileInputRef.current.files[0]);
       if (url === null) return;
       fileUrl = url;
     }
-
     const { error } = await supabase.from('programs').update({
-      name: editingProgram.name,
-      description: editingProgram.description,
-      program_type: editingProgram.program_type,
-      quota: Number(editingProgram.quota),
-      schedule_date: editingProgram.schedule_date || null,
-      is_open: editingProgram.is_open,
-      file_url: fileUrl,
+      name: editingProgram.name, description: editingProgram.description, program_type: editingProgram.program_type,
+      quota: Number(editingProgram.quota), schedule_date: editingProgram.schedule_date || null,
+      is_open: editingProgram.is_open, file_url: fileUrl,
     } as any).eq('id', editingProgram.id);
     if (error) { toast.error(error.message); return; }
     toast.success('Program berhasil diperbarui');
@@ -269,6 +295,38 @@ export default function PegawaiDashboard() {
           </div>
         </div>
 
+        {/* Notifications */}
+        {clientsWithEndedGuidance.length > 0 && (
+          <Alert variant="destructive" className="border-destructive/50 bg-destructive/10">
+            <Bell className="h-4 w-4" />
+            <AlertTitle>Masa Bimbingan Selesai</AlertTitle>
+            <AlertDescription>
+              {clientsWithEndedGuidance.length} klien telah melewati masa bimbingan dan perlu diakhiri:
+              <ul className="mt-2 space-y-1">
+                {clientsWithEndedGuidance.map(c => (
+                  <li key={c.id} className="flex items-center justify-between">
+                    <span>{(c as any).profile?.full_name} — berakhir {format(new Date(c.guidance_end), 'dd MMM yyyy')}</span>
+                    <Button size="sm" variant="outline" onClick={() => endGuidance(c.user_id)} className="ml-2">
+                      Akhiri Bimbingan
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {clientsNotReported.length > 0 && (
+          <Alert className="border-yellow-500/50 bg-yellow-500/10">
+            <Bell className="h-4 w-4 text-yellow-500" />
+            <AlertTitle className="text-yellow-500">Klien Belum Wajib Lapor</AlertTitle>
+            <AlertDescription>
+              {clientsNotReported.length} klien belum melakukan wajib lapor bulan ini:
+              {' '}{clientsNotReported.map(c => (c as any).profile?.full_name).filter(Boolean).join(', ')}
+            </AlertDescription>
+          </Alert>
+        )}
+
         {/* Filter & Search */}
         <div className="glass-card rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="flex items-center gap-2">
@@ -289,9 +347,9 @@ export default function PegawaiDashboard() {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {[
             { label: 'Total Klien', value: stats.total, icon: Users, color: 'text-primary' },
-            { label: 'Bimbingan Aktif', value: stats.aktifBimbingan, icon: BookOpen, color: 'text-info' },
-            { label: 'Sudah Bekerja', value: stats.sudahBekerja, icon: CheckCircle, color: 'text-success' },
-            { label: 'Belum Bekerja', value: stats.belumBekerja, icon: Briefcase, color: 'text-warning' },
+            { label: 'Bimbingan Aktif', value: stats.aktifBimbingan, icon: BookOpen, color: 'text-primary' },
+            { label: 'Sudah Bekerja', value: stats.sudahBekerja, icon: CheckCircle, color: 'text-primary' },
+            { label: 'Belum Bekerja', value: stats.belumBekerja, icon: Briefcase, color: 'text-primary' },
           ].map((s, i) => (
             <div key={i} className="glass-card rounded-2xl p-5">
               <s.icon className={`w-6 h-6 ${s.color} mb-2`} />
@@ -395,49 +453,73 @@ export default function PegawaiDashboard() {
                 <thead>
                   <tr className="border-b border-border text-left">
                     <th className="pb-3 text-muted-foreground font-medium">Nama</th>
-                    <th className="pb-3 text-muted-foreground font-medium">Jenis Kelamin</th>
-                    <th className="pb-3 text-muted-foreground font-medium">Alamat</th>
-                    <th className="pb-3 text-muted-foreground font-medium">No. Telepon</th>
                     <th className="pb-3 text-muted-foreground font-medium">No. Litmas</th>
                     <th className="pb-3 text-muted-foreground font-medium">Bimbingan</th>
-                    <th className="pb-3 text-muted-foreground font-medium">Pekerjaan</th>
+                    <th className="pb-3 text-muted-foreground font-medium">Masa Bimbingan</th>
+                    <th className="pb-3 text-muted-foreground font-medium">Wajib Lapor</th>
                     <th className="pb-3 text-muted-foreground font-medium">Status Klien</th>
                     <th className="pb-3 text-muted-foreground font-medium">Verifikasi</th>
                     <th className="pb-3 text-muted-foreground font-medium">Aksi</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {displayedClients.map(c => (
-                    <tr key={c.id} className="border-b border-border/50">
-                      <td className="py-3">{(c as any).profile?.full_name || '-'}</td>
-                      <td className="py-3 capitalize">{(c as any).profile?.gender || '-'}</td>
-                      <td className="py-3 max-w-[200px] truncate" title={(c as any).profile?.address || ''}>{(c as any).profile?.address || '-'}</td>
-                      <td className="py-3">{(c as any).profile?.phone || '-'}</td>
-                      <td className="py-3">{c.case_number || '-'}</td>
-                      <td className="py-3"><Badge variant="outline" className="capitalize">{c.guidance_status}</Badge></td>
-                      <td className="py-3 capitalize">{c.employment_status?.replace('_', ' ')}</td>
-                      <td className="py-3">
-                        <Select value={(c as any).client_status || 'aktif'} onValueChange={v => updateClientStatus(c.user_id, v)}>
-                          <SelectTrigger className="h-8 w-[150px]">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="aktif">Aktif</SelectItem>
-                            <SelectItem value="meninggal">Meninggal</SelectItem>
-                            <SelectItem value="di_luar_wilayah">Di Luar Wilayah</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </td>
-                      <td className="py-3">{(c as any).profile?.is_verified ? <Badge variant="default">✓</Badge> : <Badge variant="secondary">✗</Badge>}</td>
-                      <td className="py-3">
-                        <div className="flex gap-1 flex-wrap">
-                          {!(c as any).profile?.is_verified && (
-                            <Button size="sm" variant="outline" onClick={() => verifyClient(c.user_id)}>Verifikasi</Button>
+                  {displayedClients.map(c => {
+                    const reportedThisMonth = monthlyReports.some(
+                      r => r.client_id === c.user_id && r.report_month === currentMonth && r.report_year === currentYear
+                    );
+                    return (
+                      <tr key={c.id} className="border-b border-border/50">
+                        <td className="py-3">
+                          <div>
+                            <p>{(c as any).profile?.full_name || '-'}</p>
+                            <p className="text-xs text-muted-foreground">{(c as any).profile?.phone || ''}</p>
+                          </div>
+                        </td>
+                        <td className="py-3">{c.case_number || '-'}</td>
+                        <td className="py-3"><Badge variant="outline" className="capitalize">{c.guidance_status}</Badge></td>
+                        <td className="py-3">
+                          {c.guidance_start && c.guidance_end ? (
+                            <span className="text-xs">
+                              {format(new Date(c.guidance_start), 'dd/MM/yy')} - {format(new Date(c.guidance_end), 'dd/MM/yy')}
+                            </span>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">Belum diatur</span>
                           )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                        <td className="py-3">
+                          {reportedThisMonth ? (
+                            <Badge variant="default">✓ Sudah</Badge>
+                          ) : (
+                            <Badge variant="secondary">✗ Belum</Badge>
+                          )}
+                        </td>
+                        <td className="py-3">
+                          <Select value={(c as any).client_status || 'aktif'} onValueChange={v => updateClientStatus(c.user_id, v)}>
+                            <SelectTrigger className="h-8 w-[150px]"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="aktif">Aktif</SelectItem>
+                              <SelectItem value="meninggal">Meninggal</SelectItem>
+                              <SelectItem value="di_luar_wilayah">Di Luar Wilayah</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </td>
+                        <td className="py-3">{(c as any).profile?.is_verified ? <Badge variant="default">✓</Badge> : <Badge variant="secondary">✗</Badge>}</td>
+                        <td className="py-3">
+                          <div className="flex gap-1 flex-wrap">
+                            <Button size="sm" variant="outline" onClick={() => openGuidanceDialog(c)} title="Atur Masa Bimbingan">
+                              <CalendarDays className="w-3 h-3 mr-1" /> Masa
+                            </Button>
+                            {!(c as any).profile?.is_verified && (
+                              <Button size="sm" variant="outline" onClick={() => verifyClient(c.user_id)}>Verifikasi</Button>
+                            )}
+                            {c.guidance_end && new Date(c.guidance_end) <= new Date() && c.guidance_status === 'aktif' && (
+                              <Button size="sm" variant="destructive" onClick={() => endGuidance(c.user_id)}>Akhiri</Button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -469,11 +551,32 @@ export default function PegawaiDashboard() {
           <DialogContent className="bg-card border-border">
             <DialogHeader><DialogTitle>Hapus Program</DialogTitle></DialogHeader>
             <p className="text-sm text-muted-foreground">
-              Apakah Anda yakin ingin menghapus program <strong>{programToDelete?.name}</strong>? Tindakan ini tidak dapat dibatalkan.
+              Apakah Anda yakin ingin menghapus program <strong>{programToDelete?.name}</strong>?
             </p>
             <div className="flex gap-3 justify-end pt-2">
               <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>Batal</Button>
               <Button variant="destructive" onClick={deleteProgram}>Hapus</Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Guidance Period Dialog */}
+        <Dialog open={guidanceDialogOpen} onOpenChange={setGuidanceDialogOpen}>
+          <DialogContent className="bg-card border-border">
+            <DialogHeader><DialogTitle>Atur Masa Bimbingan</DialogTitle></DialogHeader>
+            <p className="text-sm text-muted-foreground mb-2">
+              Klien: <strong>{(guidanceClient as any)?.profile?.full_name}</strong>
+            </p>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Tanggal Mulai Bimbingan</Label>
+                <Input type="date" value={guidanceForm.guidance_start} onChange={e => setGuidanceForm(f => ({ ...f, guidance_start: e.target.value }))} />
+              </div>
+              <div className="space-y-2">
+                <Label>Tanggal Berakhir Bimbingan</Label>
+                <Input type="date" value={guidanceForm.guidance_end} onChange={e => setGuidanceForm(f => ({ ...f, guidance_end: e.target.value }))} />
+              </div>
+              <Button onClick={saveGuidancePeriod} className="w-full">Simpan</Button>
             </div>
           </DialogContent>
         </Dialog>
