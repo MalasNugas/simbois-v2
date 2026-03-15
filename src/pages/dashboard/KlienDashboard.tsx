@@ -8,16 +8,14 @@ import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { User, BookOpen, MapPin, Briefcase, Calendar, Clock, ShieldCheck, Pencil } from 'lucide-react';
+import { User, BookOpen, MapPin, Briefcase, Calendar as CalendarIcon, Clock, ShieldCheck, Pencil, ClipboardCheck } from 'lucide-react';
 import { format } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import MonthlyReportCalendar from '@/components/MonthlyReportCalendar';
+import WajibLaporReminder from '@/components/WajibLaporReminder';
 
-// Batas wilayah Bapas Malang (Kota/Kab Malang, Probolinggo, Pasuruan, Kota Batu)
 const BAPAS_BOUNDS = {
-  latMin: -8.6,
-  latMax: -7.55,
-  lngMin: 112.15,
-  lngMax: 113.5,
+  latMin: -8.6, latMax: -7.55, lngMin: 112.15, lngMax: 113.5,
 };
 
 function isInsideBapasArea(lat: number, lng: number) {
@@ -37,6 +35,15 @@ export default function KlienDashboard() {
   const [savingEmployment, setSavingEmployment] = useState(false);
   const [pegawaiList, setPegawaiList] = useState<{ user_id: string; full_name: string }[]>([]);
   const [savingPk, setSavingPk] = useState(false);
+  const [monthlyReports, setMonthlyReports] = useState<any[]>([]);
+  const [submittingReport, setSubmittingReport] = useState(false);
+
+  const now = new Date();
+  const currentMonth = now.getMonth() + 1;
+  const currentYear = now.getFullYear();
+  const hasReportedThisMonth = monthlyReports.some(
+    r => r.report_month === currentMonth && r.report_year === currentYear
+  );
 
   useEffect(() => {
     if (!user) return;
@@ -52,11 +59,9 @@ export default function KlienDashboard() {
         await supabase.from('location_tracking').insert({
           user_id: user!.id, latitude, longitude, accuracy,
         });
-        // Check if outside Bapas area
         if (!isInsideBapasArea(latitude, longitude)) {
           await supabase.from('clients').update({ client_status: 'di_luar_wilayah' } as any).eq('user_id', user!.id);
         } else {
-          // Reset to aktif if back inside
           const { data: cl } = await supabase.from('clients').select('client_status').eq('user_id', user!.id).maybeSingle();
           if ((cl as any)?.client_status === 'di_luar_wilayah') {
             await supabase.from('clients').update({ client_status: 'aktif' } as any).eq('user_id', user!.id);
@@ -69,11 +74,12 @@ export default function KlienDashboard() {
   };
 
   const loadData = async () => {
-    const [profileRes, clientRes, programsRes, regsRes] = await Promise.all([
+    const [profileRes, clientRes, programsRes, regsRes, reportsRes] = await Promise.all([
       supabase.from('profiles').select('*').eq('user_id', user!.id).maybeSingle(),
       supabase.from('clients').select('*').eq('user_id', user!.id).maybeSingle(),
       supabase.from('programs').select('*').eq('is_open', true).order('schedule_date', { ascending: true }),
       supabase.from('program_registrations').select('*, programs(*)').eq('client_id', user!.id),
+      supabase.from('monthly_reports' as any).select('*').eq('client_id', user!.id),
     ]);
     const p = profileRes.data;
     setProfile(p);
@@ -81,8 +87,8 @@ export default function KlienDashboard() {
     setClient(clientRes.data);
     setPrograms(programsRes.data || []);
     setRegistrations(regsRes.data || []);
+    setMonthlyReports((reportsRes.data as any[]) || []);
 
-    // Load pegawai list
     const { data: pegawai } = await supabase.rpc('get_pegawai_list');
     setPegawaiList(pegawai || []);
 
@@ -102,7 +108,6 @@ export default function KlienDashboard() {
       address: editForm.address || null,
     } as any).eq('user_id', user!.id);
     if (error) { toast.error(error.message); return; }
-    // Save case_number to clients table
     if (editForm.case_number !== undefined) {
       await supabase.from('clients').update({ case_number: editForm.case_number || null }).eq('user_id', user!.id);
     }
@@ -129,6 +134,27 @@ export default function KlienDashboard() {
     loadData();
   };
 
+  const submitWajibLapor = async () => {
+    setSubmittingReport(true);
+    const { error } = await supabase.from('monthly_reports' as any).insert({
+      client_id: user!.id,
+      report_date: format(now, 'yyyy-MM-dd'),
+      report_month: currentMonth,
+      report_year: currentYear,
+    });
+    setSubmittingReport(false);
+    if (error) {
+      if (error.message.includes('duplicate') || error.message.includes('unique')) {
+        toast.error('Anda sudah melakukan wajib lapor bulan ini');
+      } else {
+        toast.error(error.message);
+      }
+      return;
+    }
+    toast.success('Wajib lapor berhasil dicatat!');
+    loadData();
+  };
+
   const registerProgram = async (programId: string) => {
     const { error } = await supabase.from('program_registrations').insert({ program_id: programId, client_id: user!.id });
     if (error) {
@@ -149,14 +175,18 @@ export default function KlienDashboard() {
     return <Badge variant={s.variant}>{s.label}</Badge>;
   };
 
-  const genderLabel: Record<string, string> = {
-    laki_laki: 'Laki-laki', perempuan: 'Perempuan',
-  };
+  const genderLabel: Record<string, string> = { laki_laki: 'Laki-laki', perempuan: 'Perempuan' };
+
+  const guidanceEndDate = (client as any)?.guidance_end;
+  const guidanceStartDate = (client as any)?.guidance_start;
 
   return (
     <div className="min-h-screen pt-20 pb-12 px-4">
       <div className="container mx-auto max-w-6xl space-y-8">
         <h1 className="text-3xl font-bold">Dashboard Klien</h1>
+
+        {/* Wajib Lapor Reminder */}
+        <WajibLaporReminder hasReportedThisMonth={hasReportedThisMonth} guidanceEnd={guidanceEndDate} />
 
         <div className="grid md:grid-cols-3 gap-6">
           {/* Profile Card */}
@@ -180,6 +210,7 @@ export default function KlienDashboard() {
             </div>
           </div>
 
+          {/* Status Card */}
           <div className="glass-card rounded-2xl p-6">
             <div className="flex items-center gap-3 mb-4">
               <Briefcase className="w-5 h-5 text-primary" />
@@ -199,6 +230,8 @@ export default function KlienDashboard() {
                 </Select>
               </div>
               <p><span className="text-muted-foreground">No. Litmas:</span> {client?.case_number || '-'}</p>
+              {guidanceStartDate && <p><span className="text-muted-foreground">Mulai Bimbingan:</span> {format(new Date(guidanceStartDate), 'dd MMM yyyy')}</p>}
+              {guidanceEndDate && <p><span className="text-muted-foreground">Akhir Bimbingan:</span> {format(new Date(guidanceEndDate), 'dd MMM yyyy')}</p>}
             </div>
           </div>
 
@@ -226,6 +259,41 @@ export default function KlienDashboard() {
                 </Select>
               </div>
             )}
+          </div>
+        </div>
+
+        {/* Wajib Lapor & Calendar */}
+        <div className="grid md:grid-cols-2 gap-6">
+          <div className="glass-card rounded-2xl p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <ClipboardCheck className="w-5 h-5 text-primary" />
+              <h2 className="font-semibold">Wajib Lapor Bulanan</h2>
+            </div>
+            {hasReportedThisMonth ? (
+              <div className="space-y-3">
+                <Badge variant="default" className="text-sm">✓ Sudah Wajib Lapor Bulan Ini</Badge>
+                <p className="text-sm text-muted-foreground">
+                  Anda sudah melakukan wajib lapor untuk bulan {format(now, 'MMMM yyyy')}.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <p className="text-sm text-muted-foreground">
+                  Anda belum melakukan wajib lapor bulan ini. Klik tombol di bawah untuk melakukan absensi.
+                </p>
+                <Button onClick={submitWajibLapor} disabled={submittingReport} className="w-full">
+                  {submittingReport ? 'Mengirim...' : 'Lakukan Wajib Lapor'}
+                </Button>
+              </div>
+            )}
+          </div>
+
+          <div className="glass-card rounded-2xl p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <CalendarIcon className="w-5 h-5 text-primary" />
+              <h2 className="font-semibold">Kalender Monitoring Wajib Lapor</h2>
+            </div>
+            <MonthlyReportCalendar reports={monthlyReports} />
           </div>
         </div>
 
@@ -264,7 +332,7 @@ export default function KlienDashboard() {
                     <p className="text-sm text-muted-foreground">{p.description}</p>
                     {p.schedule_date && (
                       <p className="text-xs text-muted-foreground flex items-center gap-1">
-                        <Calendar className="w-3 h-3" /> {format(new Date(p.schedule_date), 'dd MMM yyyy HH:mm')}
+                        <CalendarIcon className="w-3 h-3" /> {format(new Date(p.schedule_date), 'dd MMM yyyy HH:mm')}
                       </p>
                     )}
                     {(p as any).file_url && (
