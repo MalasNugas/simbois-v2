@@ -24,6 +24,8 @@ export type Database = {
           employment_status:
             | Database["public"]["Enums"]["employment_status"]
             | null
+          guidance_end: string | null
+          guidance_start: string | null
           guidance_status: Database["public"]["Enums"]["guidance_status"] | null
           id: string
           referred_to_disnaker: boolean | null
@@ -40,6 +42,8 @@ export type Database = {
           employment_status?:
             | Database["public"]["Enums"]["employment_status"]
             | null
+          guidance_end?: string | null
+          guidance_start?: string | null
           guidance_status?:
             | Database["public"]["Enums"]["guidance_status"]
             | null
@@ -58,6 +62,8 @@ export type Database = {
           employment_status?:
             | Database["public"]["Enums"]["employment_status"]
             | null
+          guidance_end?: string | null
+          guidance_start?: string | null
           guidance_status?:
             | Database["public"]["Enums"]["guidance_status"]
             | null
@@ -93,6 +99,36 @@ export type Database = {
           longitude?: number
           tracked_at?: string | null
           user_id?: string
+        }
+        Relationships: []
+      }
+      monthly_reports: {
+        Row: {
+          client_id: string
+          created_at: string | null
+          id: string
+          notes: string | null
+          report_date: string
+          report_month: number
+          report_year: number
+        }
+        Insert: {
+          client_id: string
+          created_at?: string | null
+          id?: string
+          notes?: string | null
+          report_date?: string
+          report_month: number
+          report_year: number
+        }
+        Update: {
+          client_id?: string
+          created_at?: string | null
+          id?: string
+          notes?: string | null
+          report_date?: string
+          report_month?: number
+          report_year?: number
         }
         Relationships: []
       }
