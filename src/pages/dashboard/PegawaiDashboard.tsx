@@ -91,6 +91,9 @@ export default function PegawaiDashboard() {
   const displayedClients = clients
     .filter(c => !c.assigned_pk_id || c.assigned_pk_id === user?.id)
     .filter(c => !showOnlyMyClients || c.assigned_pk_id === user?.id)
+    .filter(c => filterClientStatus === 'all' || (c.client_status || 'aktif') === filterClientStatus)
+    .filter(c => filterGuidanceStatus === 'all' || (c.guidance_status || 'aktif') === filterGuidanceStatus)
+    .filter(c => filterEmploymentStatus === 'all' || (c.employment_status || 'belum_bekerja') === filterEmploymentStatus)
     .filter(c => {
       if (!searchQuery.trim()) return true;
       const name = ((c as any).profile?.full_name || '').toLowerCase();
