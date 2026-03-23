@@ -129,6 +129,28 @@ export default function PegawaiDashboard() {
     belumBekerja: displayedClients.filter(c => c.employment_status === 'belum_bekerja').length,
   };
 
+  const exportToExcel = () => {
+    const guidanceLabel: Record<string, string> = { aktif: 'Aktif', selesai: 'Selesai', tidak_aktif: 'Tidak Aktif' };
+    const employmentLabel: Record<string, string> = { belum_bekerja: 'Belum Bekerja', sedang_pelatihan: 'Sedang Pelatihan', sudah_bekerja: 'Sudah Bekerja' };
+    const rows = displayedClients.map((c, i) => ({
+      'No': i + 1,
+      'Nama': (c as any).profile?.full_name || '-',
+      'No. Litmas': c.case_number || '-',
+      'Status Klien': clientStatusLabel[c.client_status || 'aktif'] || c.client_status || '-',
+      'Status Bimbingan': guidanceLabel[c.guidance_status || 'aktif'] || c.guidance_status || '-',
+      'Status Pekerjaan': employmentLabel[c.employment_status || 'belum_bekerja'] || c.employment_status || '-',
+      'Mulai Bimbingan': c.guidance_start ? format(new Date(c.guidance_start), 'dd/MM/yyyy') : '-',
+      'Akhir Bimbingan': c.guidance_end ? format(new Date(c.guidance_end), 'dd/MM/yyyy') : '-',
+      'Telepon': (c as any).profile?.phone || '-',
+      'Alamat': (c as any).profile?.address || '-',
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Data Klien');
+    XLSX.writeFile(wb, `data_klien_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
+    toast.success('Data berhasil di-export');
+  };
+
   const updateClientStatus = async (userId: string, status: string) => {
     const { error } = await supabase.from('clients').update({ client_status: status } as any).eq('user_id', userId);
     if (error) toast.error(error.message);
