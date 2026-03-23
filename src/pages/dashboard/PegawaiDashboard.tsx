@@ -24,6 +24,9 @@ export default function PegawaiDashboard() {
   const [registrations, setRegistrations] = useState<any[]>([]);
   const [showMap, setShowMap] = useState(false);
   const [showOnlyMyClients, setShowOnlyMyClients] = useState(true);
+  const [filterClientStatus, setFilterClientStatus] = useState('all');
+  const [filterGuidanceStatus, setFilterGuidanceStatus] = useState('all');
+  const [filterEmploymentStatus, setFilterEmploymentStatus] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [newProgram, setNewProgram] = useState({
     name: '', description: '', program_type: 'kepribadian', quota: 20, schedule_date: '',
@@ -88,6 +91,9 @@ export default function PegawaiDashboard() {
   const displayedClients = clients
     .filter(c => !c.assigned_pk_id || c.assigned_pk_id === user?.id)
     .filter(c => !showOnlyMyClients || c.assigned_pk_id === user?.id)
+    .filter(c => filterClientStatus === 'all' || (c.client_status || 'aktif') === filterClientStatus)
+    .filter(c => filterGuidanceStatus === 'all' || (c.guidance_status || 'aktif') === filterGuidanceStatus)
+    .filter(c => filterEmploymentStatus === 'all' || (c.employment_status || 'belum_bekerja') === filterEmploymentStatus)
     .filter(c => {
       if (!searchQuery.trim()) return true;
       const name = ((c as any).profile?.full_name || '').toLowerCase();
@@ -330,18 +336,58 @@ export default function PegawaiDashboard() {
         )}
 
         {/* Filter & Search */}
-        <div className="glass-card rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <Filter className="w-4 h-4 text-primary" />
-            <span className="text-sm font-medium">Tampilkan hanya klien saya</span>
-            <Switch checked={showOnlyMyClients} onCheckedChange={setShowOnlyMyClients} />
-            <span className="text-xs text-muted-foreground ml-2">
-              {showOnlyMyClients ? `${displayedClients.length} klien Anda` : `${displayedClients.length} klien`}
-            </span>
+        <div className="glass-card rounded-xl p-4 space-y-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-2">
+              <Filter className="w-4 h-4 text-primary" />
+              <span className="text-sm font-medium">Tampilkan hanya klien saya</span>
+              <Switch checked={showOnlyMyClients} onCheckedChange={setShowOnlyMyClients} />
+              <span className="text-xs text-muted-foreground ml-2">
+                {showOnlyMyClients ? `${displayedClients.length} klien Anda` : `${displayedClients.length} klien`}
+              </span>
+            </div>
+            <div className="relative w-full sm:w-72">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input placeholder="Cari nama atau no. litmas..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-9" />
+            </div>
           </div>
-          <div className="relative w-full sm:w-72">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input placeholder="Cari nama atau no. litmas..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-9" />
+          <div className="flex flex-wrap gap-3">
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Status Klien</Label>
+              <Select value={filterClientStatus} onValueChange={setFilterClientStatus}>
+                <SelectTrigger className="w-[160px] h-8 text-xs"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Semua</SelectItem>
+                  <SelectItem value="aktif">Aktif</SelectItem>
+                  <SelectItem value="meninggal">Meninggal</SelectItem>
+                  <SelectItem value="di_luar_wilayah">Di Luar Wilayah</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Status Bimbingan</Label>
+              <Select value={filterGuidanceStatus} onValueChange={setFilterGuidanceStatus}>
+                <SelectTrigger className="w-[160px] h-8 text-xs"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Semua</SelectItem>
+                  <SelectItem value="aktif">Aktif</SelectItem>
+                  <SelectItem value="selesai">Selesai</SelectItem>
+                  <SelectItem value="tidak_aktif">Tidak Aktif</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Status Pekerjaan</Label>
+              <Select value={filterEmploymentStatus} onValueChange={setFilterEmploymentStatus}>
+                <SelectTrigger className="w-[160px] h-8 text-xs"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Semua</SelectItem>
+                  <SelectItem value="belum_bekerja">Belum Bekerja</SelectItem>
+                  <SelectItem value="sedang_pelatihan">Sedang Pelatihan</SelectItem>
+                  <SelectItem value="sudah_bekerja">Sudah Bekerja</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </div>
 
