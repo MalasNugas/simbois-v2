@@ -24,6 +24,9 @@ export default function PegawaiDashboard() {
   const [registrations, setRegistrations] = useState<any[]>([]);
   const [showMap, setShowMap] = useState(false);
   const [showOnlyMyClients, setShowOnlyMyClients] = useState(true);
+  const [filterClientStatus, setFilterClientStatus] = useState('all');
+  const [filterGuidanceStatus, setFilterGuidanceStatus] = useState('all');
+  const [filterEmploymentStatus, setFilterEmploymentStatus] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [newProgram, setNewProgram] = useState({
     name: '', description: '', program_type: 'kepribadian', quota: 20, schedule_date: '',
