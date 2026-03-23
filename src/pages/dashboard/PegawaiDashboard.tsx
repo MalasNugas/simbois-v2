@@ -8,7 +8,8 @@ import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { Users, BookOpen, Briefcase, MapPin, Plus, CheckCircle, XCircle, Filter, Search, Pencil, Trash2, FileText, Bell, CalendarDays, Download } from 'lucide-react';
-import * as XLSX from 'xlsx';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
 import { format } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -129,26 +130,30 @@ export default function PegawaiDashboard() {
     belumBekerja: displayedClients.filter(c => c.employment_status === 'belum_bekerja').length,
   };
 
-  const exportToExcel = () => {
+  const exportToPdf = () => {
     const guidanceLabel: Record<string, string> = { aktif: 'Aktif', selesai: 'Selesai', tidak_aktif: 'Tidak Aktif' };
     const employmentLabel: Record<string, string> = { belum_bekerja: 'Belum Bekerja', sedang_pelatihan: 'Sedang Pelatihan', sudah_bekerja: 'Sudah Bekerja' };
-    const rows = displayedClients.map((c, i) => ({
-      'No': i + 1,
-      'Nama': (c as any).profile?.full_name || '-',
-      'No. Litmas': c.case_number || '-',
-      'Status Klien': clientStatusLabel[c.client_status || 'aktif'] || c.client_status || '-',
-      'Status Bimbingan': guidanceLabel[c.guidance_status || 'aktif'] || c.guidance_status || '-',
-      'Status Pekerjaan': employmentLabel[c.employment_status || 'belum_bekerja'] || c.employment_status || '-',
-      'Mulai Bimbingan': c.guidance_start ? format(new Date(c.guidance_start), 'dd/MM/yyyy') : '-',
-      'Akhir Bimbingan': c.guidance_end ? format(new Date(c.guidance_end), 'dd/MM/yyyy') : '-',
-      'Telepon': (c as any).profile?.phone || '-',
-      'Alamat': (c as any).profile?.address || '-',
-    }));
-    const ws = XLSX.utils.json_to_sheet(rows);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Data Klien');
-    XLSX.writeFile(wb, `data_klien_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
-    toast.success('Data berhasil di-export');
+    const doc = new jsPDF({ orientation: 'landscape' });
+    doc.setFontSize(14);
+    doc.text('Laporan Data Klien', 14, 15);
+    doc.setFontSize(9);
+    doc.text(`Tanggal: ${format(new Date(), 'dd/MM/yyyy')}  |  Jumlah: ${displayedClients.length} klien`, 14, 22);
+    const head = [['No', 'Nama', 'No. Litmas', 'Status Klien', 'Status Bimbingan', 'Status Pekerjaan', 'Mulai', 'Akhir', 'Telepon', 'Alamat']];
+    const body = displayedClients.map((c, i) => [
+      i + 1,
+      (c as any).profile?.full_name || '-',
+      c.case_number || '-',
+      clientStatusLabel[c.client_status || 'aktif'] || c.client_status || '-',
+      guidanceLabel[c.guidance_status || 'aktif'] || c.guidance_status || '-',
+      employmentLabel[c.employment_status || 'belum_bekerja'] || c.employment_status || '-',
+      c.guidance_start ? format(new Date(c.guidance_start), 'dd/MM/yyyy') : '-',
+      c.guidance_end ? format(new Date(c.guidance_end), 'dd/MM/yyyy') : '-',
+      (c as any).profile?.phone || '-',
+      (c as any).profile?.address || '-',
+    ]);
+    (doc as any).autoTable({ head, body, startY: 28, styles: { fontSize: 7 }, headStyles: { fillColor: [41, 128, 185] } });
+    doc.save(`data_klien_${format(new Date(), 'yyyy-MM-dd')}.pdf`);
+    toast.success('Data berhasil di-export ke PDF');
   };
 
   const updateClientStatus = async (userId: string, status: string) => {
@@ -412,8 +417,8 @@ export default function PegawaiDashboard() {
               </Select>
             </div>
             <div className="flex items-end">
-              <Button size="sm" variant="outline" className="h-8 text-xs gap-1" onClick={exportToExcel}>
-                <Download className="w-3 h-3" /> Export Excel
+              <Button size="sm" variant="outline" className="h-8 text-xs gap-1" onClick={exportToPdf}>
+                <Download className="w-3 h-3" /> Export PDF
               </Button>
             </div>
           </div>
