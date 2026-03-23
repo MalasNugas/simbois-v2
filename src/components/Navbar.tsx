@@ -2,6 +2,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
 import { Menu, X, LogOut } from 'lucide-react';
+import NotificationBell from '@/components/NotificationBell';
 import { useState } from 'react';
 
 export default function Navbar() {
