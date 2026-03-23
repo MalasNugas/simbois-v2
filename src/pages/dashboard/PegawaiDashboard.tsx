@@ -389,6 +389,11 @@ export default function PegawaiDashboard() {
                 </SelectContent>
               </Select>
             </div>
+            <div className="flex items-end">
+              <Button size="sm" variant="outline" className="h-8 text-xs gap-1" onClick={exportToExcel}>
+                <Download className="w-3 h-3" /> Export Excel
+              </Button>
+            </div>
           </div>
         </div>
 
