@@ -528,6 +528,12 @@ export default function PegawaiDashboard() {
           )}
         </div>
 
+        {/* Chat */}
+        <PegawaiChatList clients={displayedClients.map(c => ({ user_id: c.user_id, profile: (c as any).profile }))} />
+
+        {/* Statistics */}
+        <StatistikDashboard clients={displayedClients} monthlyReports={monthlyReports} />
+
         {/* Edit Program Dialog */}
         <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
           <DialogContent className="bg-card border-border max-h-[85vh] overflow-y-auto">

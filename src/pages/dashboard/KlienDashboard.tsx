@@ -406,6 +406,11 @@ export default function KlienDashboard() {
             </div>
           </DialogContent>
         </Dialog>
+
+        {/* Chat Widget */}
+        {client?.assigned_pk_id && pkName && (
+          <ChatWidget partnerId={client.assigned_pk_id} partnerName={pkName} />
+        )}
       </div>
     </div>
   );
