@@ -333,7 +333,7 @@ export default function KlienDashboard() {
                     <p className="text-sm text-muted-foreground">{p.description}</p>
                     {p.schedule_date && (
                       <p className="text-xs text-muted-foreground flex items-center gap-1">
-                        <CalendarIcon className="w-3 h-3" /> {format(new Date(p.schedule_date), 'dd MMM yyyy HH:mm')}
+                        <CalendarIcon className="w-3 h-3 text-white" /> {format(new Date(p.schedule_date), 'dd MMM yyyy HH:mm')}
                       </p>
                     )}
                     {(p as any).file_url && (
