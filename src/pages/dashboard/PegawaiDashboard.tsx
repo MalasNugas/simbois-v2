@@ -528,8 +528,7 @@ export default function PegawaiDashboard() {
           )}
         </div>
 
-        {/* Chat */}
-        <PegawaiChatList clients={displayedClients.map(c => ({ user_id: c.user_id, profile: (c as any).profile }))} />
+        {/* Chat - rendered as floating widget outside container */}
 
         {/* Statistics */}
         <StatistikDashboard clients={displayedClients} monthlyReports={monthlyReports} />
