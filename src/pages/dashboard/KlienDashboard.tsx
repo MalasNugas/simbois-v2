@@ -291,7 +291,7 @@ export default function KlienDashboard() {
 
           <div className="glass-card rounded-2xl p-6">
             <div className="flex items-center gap-3 mb-4">
-              <CalendarIcon className="w-5 h-5 text-primary" />
+              <CalendarIcon className="w-5 h-5 text-white" />
               <h2 className="font-semibold">Kalender Monitoring Wajib Lapor</h2>
             </div>
             <MonthlyReportCalendar reports={monthlyReports} />
