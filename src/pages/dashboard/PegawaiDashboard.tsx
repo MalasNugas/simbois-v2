@@ -14,6 +14,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import ClientMapView from '@/components/ClientMapView';
+import StatistikDashboard from '@/components/StatistikDashboard';
+import PegawaiChatList from '@/components/PegawaiChatList';
 
 export default function PegawaiDashboard() {
   const { user } = useAuth();
