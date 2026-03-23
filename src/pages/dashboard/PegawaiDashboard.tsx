@@ -151,7 +151,7 @@ export default function PegawaiDashboard() {
       (c as any).profile?.phone || '-',
       (c as any).profile?.address || '-',
     ]);
-    (doc as any).autoTable({ head, body, startY: 28, styles: { fontSize: 7 }, headStyles: { fillColor: [41, 128, 185] } });
+    autoTable(doc, { head, body, startY: 28, styles: { fontSize: 7 }, headStyles: { fillColor: [41, 128, 185] } });
     doc.save(`data_klien_${format(new Date(), 'yyyy-MM-dd')}.pdf`);
     toast.success('Data berhasil di-export ke PDF');
   };
