@@ -7,7 +7,8 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
-import { Users, BookOpen, Briefcase, MapPin, Plus, CheckCircle, XCircle, Filter, Search, Pencil, Trash2, FileText, Bell, CalendarDays } from 'lucide-react';
+import { Users, BookOpen, Briefcase, MapPin, Plus, CheckCircle, XCircle, Filter, Search, Pencil, Trash2, FileText, Bell, CalendarDays, Download } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { format } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -126,6 +127,28 @@ export default function PegawaiDashboard() {
     aktifBimbingan: displayedClients.filter(c => c.guidance_status === 'aktif').length,
     sudahBekerja: displayedClients.filter(c => c.employment_status === 'sudah_bekerja').length,
     belumBekerja: displayedClients.filter(c => c.employment_status === 'belum_bekerja').length,
+  };
+
+  const exportToExcel = () => {
+    const guidanceLabel: Record<string, string> = { aktif: 'Aktif', selesai: 'Selesai', tidak_aktif: 'Tidak Aktif' };
+    const employmentLabel: Record<string, string> = { belum_bekerja: 'Belum Bekerja', sedang_pelatihan: 'Sedang Pelatihan', sudah_bekerja: 'Sudah Bekerja' };
+    const rows = displayedClients.map((c, i) => ({
+      'No': i + 1,
+      'Nama': (c as any).profile?.full_name || '-',
+      'No. Litmas': c.case_number || '-',
+      'Status Klien': clientStatusLabel[c.client_status || 'aktif'] || c.client_status || '-',
+      'Status Bimbingan': guidanceLabel[c.guidance_status || 'aktif'] || c.guidance_status || '-',
+      'Status Pekerjaan': employmentLabel[c.employment_status || 'belum_bekerja'] || c.employment_status || '-',
+      'Mulai Bimbingan': c.guidance_start ? format(new Date(c.guidance_start), 'dd/MM/yyyy') : '-',
+      'Akhir Bimbingan': c.guidance_end ? format(new Date(c.guidance_end), 'dd/MM/yyyy') : '-',
+      'Telepon': (c as any).profile?.phone || '-',
+      'Alamat': (c as any).profile?.address || '-',
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Data Klien');
+    XLSX.writeFile(wb, `data_klien_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
+    toast.success('Data berhasil di-export');
   };
 
   const updateClientStatus = async (userId: string, status: string) => {
@@ -387,6 +410,11 @@ export default function PegawaiDashboard() {
                   <SelectItem value="sudah_bekerja">Sudah Bekerja</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+            <div className="flex items-end">
+              <Button size="sm" variant="outline" className="h-8 text-xs gap-1" onClick={exportToExcel}>
+                <Download className="w-3 h-3" /> Export Excel
+              </Button>
             </div>
           </div>
         </div>
