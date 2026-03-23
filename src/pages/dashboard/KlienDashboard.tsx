@@ -13,6 +13,7 @@ import { format } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import MonthlyReportCalendar from '@/components/MonthlyReportCalendar';
 import WajibLaporReminder from '@/components/WajibLaporReminder';
+import ChatWidget from '@/components/ChatWidget';
 
 const BAPAS_BOUNDS = {
   latMin: -8.6, latMax: -7.55, lngMin: 112.15, lngMax: 113.5,
@@ -405,6 +406,11 @@ export default function KlienDashboard() {
             </div>
           </DialogContent>
         </Dialog>
+
+        {/* Chat Widget */}
+        {client?.assigned_pk_id && pkName && (
+          <ChatWidget partnerId={client.assigned_pk_id} partnerName={pkName} />
+        )}
       </div>
     </div>
   );

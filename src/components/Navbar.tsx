@@ -2,6 +2,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
 import { Menu, X, LogOut } from 'lucide-react';
+import NotificationBell from '@/components/NotificationBell';
 import { useState } from 'react';
 
 export default function Navbar() {
@@ -41,6 +42,7 @@ export default function Navbar() {
             </div>
           ) : (
             <div className="flex items-center gap-3">
+              <NotificationBell />
               <span className="text-xs text-muted-foreground capitalize px-2 py-1 rounded-full bg-secondary">{role}</span>
               <Button variant="ghost" size="icon" onClick={handleSignOut}><LogOut className="w-4 h-4" /></Button>
             </div>

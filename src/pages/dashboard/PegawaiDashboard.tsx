@@ -14,6 +14,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import ClientMapView from '@/components/ClientMapView';
+import StatistikDashboard from '@/components/StatistikDashboard';
+import PegawaiChatList from '@/components/PegawaiChatList';
 
 export default function PegawaiDashboard() {
   const { user } = useAuth();
@@ -525,6 +527,12 @@ export default function PegawaiDashboard() {
             </div>
           )}
         </div>
+
+        {/* Chat */}
+        <PegawaiChatList clients={displayedClients.map(c => ({ user_id: c.user_id, profile: (c as any).profile }))} />
+
+        {/* Statistics */}
+        <StatistikDashboard clients={displayedClients} monthlyReports={monthlyReports} />
 
         {/* Edit Program Dialog */}
         <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
