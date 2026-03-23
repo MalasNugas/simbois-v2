@@ -588,6 +588,9 @@ export default function PegawaiDashboard() {
           </DialogContent>
         </Dialog>
       </div>
+
+      {/* Floating Chat Widget */}
+      <PegawaiChatList clients={displayedClients.map(c => ({ user_id: c.user_id, profile: (c as any).profile }))} />
     </div>
   );
 }
