@@ -701,6 +701,28 @@ export default function PegawaiDashboard() {
             </div>
           </DialogContent>
         </Dialog>
+
+        {/* Termination Report Dialog */}
+        <Dialog open={terminationDialogOpen} onOpenChange={setTerminationDialogOpen}>
+          <DialogContent className="bg-card border-border">
+            <DialogHeader><DialogTitle>Laporan Pengakhiran</DialogTitle></DialogHeader>
+            <p className="text-sm text-muted-foreground mb-2">
+              Klien: <strong>{(terminationClient as any)?.profile?.full_name}</strong>
+            </p>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Catatan Pengakhiran</Label>
+                <Textarea
+                  value={terminationNotes}
+                  onChange={e => setTerminationNotes(e.target.value)}
+                  placeholder="Tuliskan catatan laporan pengakhiran bimbingan..."
+                  rows={4}
+                />
+              </div>
+              <Button onClick={submitTerminationReport} className="w-full">Simpan Laporan</Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
 
       {/* Floating Chat Widget */}
