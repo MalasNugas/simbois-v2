@@ -380,17 +380,19 @@ export default function AdminDashboard() {
                               </Table>
                             </div>
                           </TableCell>
-                                        ) : (
-                                          <span className="text-muted-foreground text-xs">-</span>
-                                        )}
-                                      </TableCell>
-                                    </TableRow>
-                                  ))}
-                                </TableBody>
-                              </Table>
-                            </div>
-                          </TableCell>
                         </TableRow>
+                      )}
+                    </>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
                       )}
                     </>
                   ))}
