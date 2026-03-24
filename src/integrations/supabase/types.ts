@@ -356,7 +356,7 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "klien" | "pegawai"
+      app_role: "klien" | "pegawai" | "admin"
       employment_status: "belum_bekerja" | "sedang_pelatihan" | "sudah_bekerja"
       guidance_status: "aktif" | "selesai" | "tidak_aktif"
       registration_status: "pending" | "approved" | "rejected"
@@ -487,7 +487,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["klien", "pegawai"],
+      app_role: ["klien", "pegawai", "admin"],
       employment_status: ["belum_bekerja", "sedang_pelatihan", "sudah_bekerja"],
       guidance_status: ["aktif", "selesai", "tidak_aktif"],
       registration_status: ["pending", "approved", "rejected"],
