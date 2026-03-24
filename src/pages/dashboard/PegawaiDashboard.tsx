@@ -81,6 +81,7 @@ export default function PegawaiDashboard() {
     setPrograms(programsRes.data || []);
     setRegistrations(regsData);
     setMonthlyReports((reportsRes.data as any[]) || []);
+    setTerminationReports((termRes.data as any[]) || []);
   };
 
   const uploadPdf = async (file: File): Promise<string | null> => {
