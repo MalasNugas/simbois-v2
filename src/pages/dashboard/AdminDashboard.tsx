@@ -59,20 +59,15 @@ export default function AdminDashboard() {
   const loadData = async () => {
     setLoading(true);
     try {
-      // Get all pegawai
-      const { data: pegawaiUsers } = await supabase.rpc('get_pegawai_list');
-
-      // Get all clients
-      const { data: allClients } = await supabase
-        .from('clients')
-        .select('*');
-
-      // Get all profiles for client name lookup
-      const { data: allProfiles } = await supabase
-        .from('profiles')
-        .select('user_id, full_name');
+      const [{ data: pegawaiUsers }, { data: allClients }, { data: allProfiles }, { data: termReports }] = await Promise.all([
+        supabase.rpc('get_pegawai_list'),
+        supabase.from('clients').select('*'),
+        supabase.from('profiles').select('user_id, full_name'),
+        supabase.from('termination_reports' as any).select('*'),
+      ]);
 
       const profileMap = new Map(allProfiles?.map(p => [p.user_id, p.full_name]) || []);
+      const termReportClientIds = new Set((termReports || []).map((t: any) => t.client_id));
       const now = new Date();
 
       const pegawaiData: PegawaiData[] = (pegawaiUsers || []).map((p: any) => {
