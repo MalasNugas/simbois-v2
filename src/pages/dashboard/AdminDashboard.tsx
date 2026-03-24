@@ -298,9 +298,13 @@ export default function AdminDashboard() {
                             <Badge variant="destructive" className="gap-1">
                               <Clock className="w-3 h-3" /> Belum Lengkap
                             </Badge>
-                          ) : (
+                          ) : p.terminated > 0 && p.hasTerminationReport === p.terminated ? (
                             <Badge className="gap-1 bg-green-600 hover:bg-green-700">
                               <CheckCircle2 className="w-3 h-3" /> Selesai
+                            </Badge>
+                          ) : (
+                            <Badge variant="secondary" className="gap-1">
+                              <Clock className="w-3 h-3" /> Dalam Proses
                             </Badge>
                           )}
                         </TableCell>
