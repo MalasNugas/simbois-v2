@@ -307,7 +307,7 @@ export default function AdminDashboard() {
                       </TableRow>
                       {expandedPegawai === p.user_id && p.clients.length > 0 && (
                         <TableRow key={`${p.user_id}-detail`}>
-                          <TableCell colSpan={7} className="bg-muted/30 p-0">
+                          <TableCell colSpan={8} className="bg-muted/30 p-0">
                             <div className="p-4">
                               <p className="text-sm font-semibold text-muted-foreground mb-2">Detail Klien - {p.full_name}</p>
                               <Table>
@@ -318,6 +318,7 @@ export default function AdminDashboard() {
                                     <TableHead>Status Klien</TableHead>
                                     <TableHead>Status Bimbingan</TableHead>
                                     <TableHead>Masa Bimbingan</TableHead>
+                                    <TableHead>Laporan Pengakhiran</TableHead>
                                     <TableHead>Keterangan</TableHead>
                                   </TableRow>
                                 </TableHeader>
@@ -340,14 +341,45 @@ export default function AdminDashboard() {
                                           : '-'}
                                       </TableCell>
                                       <TableCell>
+                                        {c.guidance_status === 'selesai' ? (
+                                          c.hasReport ? (
+                                            <Badge className="bg-green-600 hover:bg-green-700 gap-1">
+                                              <CheckCircle2 className="w-3 h-3" /> Sudah
+                                            </Badge>
+                                          ) : (
+                                            <Badge variant="destructive" className="gap-1">
+                                              <Clock className="w-3 h-3" /> Belum Dibuat
+                                            </Badge>
+                                          )
+                                        ) : (
+                                          <span className="text-muted-foreground text-xs">-</span>
+                                        )}
+                                      </TableCell>
+                                      <TableCell>
                                         {c.needsTermination ? (
                                           <Badge variant="destructive" className="gap-1">
                                             <AlertTriangle className="w-3 h-3" /> Perlu Pengakhiran
                                           </Badge>
                                         ) : c.guidance_status === 'selesai' ? (
-                                          <Badge className="bg-green-600 hover:bg-green-700 gap-1">
-                                            <CheckCircle2 className="w-3 h-3" /> Sudah Diakhiri
-                                          </Badge>
+                                          c.hasReport ? (
+                                            <Badge className="bg-green-600 hover:bg-green-700 gap-1">
+                                              <CheckCircle2 className="w-3 h-3" /> Selesai
+                                            </Badge>
+                                          ) : (
+                                            <Badge variant="secondary" className="gap-1">
+                                              <Clock className="w-3 h-3" /> Menunggu Laporan
+                                            </Badge>
+                                          )
+                                        ) : (
+                                          <span className="text-muted-foreground text-xs">-</span>
+                                        )}
+                                      </TableCell>
+                                    </TableRow>
+                                  ))}
+                                </TableBody>
+                              </Table>
+                            </div>
+                          </TableCell>
                                         ) : (
                                           <span className="text-muted-foreground text-xs">-</span>
                                         )}
