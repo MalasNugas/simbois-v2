@@ -195,6 +195,25 @@ export default function PegawaiDashboard() {
     else { toast.success('Masa bimbingan klien telah diakhiri'); loadData(); }
   };
 
+  const openTerminationDialog = (client: any) => {
+    setTerminationClient(client);
+    setTerminationNotes('');
+    setTerminationDialogOpen(true);
+  };
+
+  const submitTerminationReport = async () => {
+    if (!terminationClient) return;
+    const { error } = await supabase.from('termination_reports' as any).insert({
+      client_id: terminationClient.user_id,
+      pegawai_id: user!.id,
+      notes: terminationNotes || null,
+    });
+    if (error) { toast.error(error.message); return; }
+    toast.success('Laporan pengakhiran berhasil dibuat');
+    setTerminationDialogOpen(false);
+    loadData();
+  };
+
   const createProgram = async () => {
     if (!newProgram.name.trim()) { toast.error('Nama program wajib diisi'); return; }
     let fileUrl: string | null = null;
