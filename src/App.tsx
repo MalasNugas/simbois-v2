@@ -10,6 +10,7 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import KlienDashboard from "./pages/dashboard/KlienDashboard";
 import PegawaiDashboard from "./pages/dashboard/PegawaiDashboard";
+import AdminDashboard from "./pages/dashboard/AdminDashboard";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
