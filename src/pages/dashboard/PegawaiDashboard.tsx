@@ -43,6 +43,10 @@ export default function PegawaiDashboard() {
   const [guidanceClient, setGuidanceClient] = useState<any>(null);
   const [guidanceForm, setGuidanceForm] = useState({ guidance_start: '', guidance_end: '' });
   const [monthlyReports, setMonthlyReports] = useState<any[]>([]);
+  const [terminationReports, setTerminationReports] = useState<any[]>([]);
+  const [terminationDialogOpen, setTerminationDialogOpen] = useState(false);
+  const [terminationClient, setTerminationClient] = useState<any>(null);
+  const [terminationNotes, setTerminationNotes] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const editFileInputRef = useRef<HTMLInputElement>(null);
 
