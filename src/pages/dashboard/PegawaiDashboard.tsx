@@ -621,6 +621,16 @@ export default function PegawaiDashboard() {
                             {c.guidance_end && new Date(c.guidance_end) <= new Date() && c.guidance_status === 'aktif' && (
                               <Button size="sm" variant="destructive" onClick={() => endGuidance(c.user_id)}>Akhiri</Button>
                             )}
+                            {c.guidance_status === 'selesai' && !terminationReports.some(t => t.client_id === c.user_id) && (
+                              <Button size="sm" variant="outline" onClick={() => openTerminationDialog(c)} className="text-destructive border-destructive/50">
+                                <FileText className="w-3 h-3 mr-1" /> Laporan Pengakhiran
+                              </Button>
+                            )}
+                            {terminationReports.some(t => t.client_id === c.user_id) && (
+                              <Badge className="bg-green-600 hover:bg-green-700 gap-1">
+                                <CheckCircle className="w-3 h-3" /> Sudah Dilaporkan
+                              </Badge>
+                            )}
                           </div>
                         </td>
                       </tr>
