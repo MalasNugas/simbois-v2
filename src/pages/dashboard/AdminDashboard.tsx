@@ -76,6 +76,7 @@ export default function AdminDashboard() {
         const clientDetails: ClientDetail[] = myClients.map(c => {
           const guidanceEndPassed = c.guidance_end && new Date(c.guidance_end) < now;
           const stillActive = c.guidance_status === 'aktif';
+          const hasReport = termReportClientIds.has(c.user_id);
           return {
             id: c.id,
             user_id: c.user_id,
@@ -86,16 +87,20 @@ export default function AdminDashboard() {
             guidance_end: c.guidance_end,
             client_status: c.client_status,
             needsTermination: !!(guidanceEndPassed && stillActive),
+            hasReport,
           };
         });
 
+        const terminatedClients = myClients.filter(c => c.guidance_status === 'selesai');
         return {
           user_id: p.user_id,
           full_name: p.full_name,
           totalClients: myClients.length,
           activeClients: myClients.filter(c => c.guidance_status === 'aktif').length,
           needsTermination: clientDetails.filter(c => c.needsTermination).length,
-          terminated: myClients.filter(c => c.guidance_status === 'selesai').length,
+          terminated: terminatedClients.length,
+          hasTerminationReport: terminatedClients.filter(c => termReportClientIds.has(c.user_id)).length,
+          pendingReport: terminatedClients.filter(c => !termReportClientIds.has(c.user_id)).length,
           clients: clientDetails,
         };
       });
