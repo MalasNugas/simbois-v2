@@ -259,6 +259,7 @@ export default function AdminDashboard() {
                     <TableHead className="text-center">Klien Aktif</TableHead>
                     <TableHead className="text-center">Perlu Pengakhiran</TableHead>
                     <TableHead className="text-center">Sudah Diakhiri</TableHead>
+                    <TableHead className="text-center">Laporan Pengakhiran</TableHead>
                     <TableHead className="text-center">Status</TableHead>
                   </TableRow>
                 </TableHeader>
