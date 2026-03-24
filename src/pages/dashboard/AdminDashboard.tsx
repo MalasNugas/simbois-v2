@@ -179,13 +179,23 @@ export default function AdminDashboard() {
           </Card>
           <Card>
             <CardContent className="p-4 flex items-center gap-3">
-              <CheckCircle2 className="w-8 h-8 text-green-500" />
+              <CheckCircle2 className="w-8 h-8 text-green-600" />
               <div>
                 <p className="text-2xl font-bold text-foreground">{totalTerminated}</p>
-                <p className="text-xs text-muted-foreground">Sudah Diakhiri</p>
+                <p className="text-xs text-muted-foreground">Laporan Selesai</p>
               </div>
             </CardContent>
           </Card>
+          {totalPendingReport > 0 && (
+            <Card className="col-span-2 md:col-span-4 border-destructive/30 bg-destructive/5">
+              <CardContent className="p-4 flex items-center gap-3">
+                <Clock className="w-6 h-6 text-destructive" />
+                <p className="text-sm text-destructive font-medium">
+                  {totalPendingReport} klien sudah selesai bimbingan tapi Pegawai PK belum membuat Laporan Pengakhiran
+                </p>
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         {/* Filter & Search */}
