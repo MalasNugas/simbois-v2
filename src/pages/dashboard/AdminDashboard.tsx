@@ -116,12 +116,13 @@ export default function AdminDashboard() {
   const totalPegawai = pegawaiList.length;
   const totalNeedsTermination = pegawaiList.reduce((sum, p) => sum + p.needsTermination, 0);
   const totalAllClients = pegawaiList.reduce((sum, p) => sum + p.totalClients, 0);
-  const totalTerminated = pegawaiList.reduce((sum, p) => sum + p.terminated, 0);
+  const totalTerminated = pegawaiList.reduce((sum, p) => sum + p.hasTerminationReport, 0);
+  const totalPendingReport = pegawaiList.reduce((sum, p) => sum + p.pendingReport, 0);
 
   const filteredPegawai = pegawaiList.filter(p => {
     const matchSearch = p.full_name.toLowerCase().includes(searchQuery.toLowerCase());
-    if (filterStatus === 'pending') return matchSearch && p.needsTermination > 0;
-    if (filterStatus === 'done') return matchSearch && p.needsTermination === 0;
+    if (filterStatus === 'pending') return matchSearch && (p.needsTermination > 0 || p.pendingReport > 0);
+    if (filterStatus === 'done') return matchSearch && p.needsTermination === 0 && p.pendingReport === 0;
     return matchSearch;
   });
 
