@@ -31,6 +31,7 @@ interface ClientDetail {
   guidance_end: string | null;
   client_status: string | null;
   needsTermination: boolean;
+  hasReport: boolean;
 }
 
 export default function AdminDashboard() {
