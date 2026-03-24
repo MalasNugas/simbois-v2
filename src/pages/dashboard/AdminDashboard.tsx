@@ -393,15 +393,3 @@ export default function AdminDashboard() {
     </div>
   );
 }
-                      )}
-                    </>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-    </div>
-  );
-}
