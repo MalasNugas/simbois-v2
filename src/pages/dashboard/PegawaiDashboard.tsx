@@ -53,11 +53,12 @@ export default function PegawaiDashboard() {
   useEffect(() => { loadData(); }, []);
 
   const loadData = async () => {
-    const [clientsRes, programsRes, regsRes, reportsRes] = await Promise.all([
+    const [clientsRes, programsRes, regsRes, reportsRes, termRes] = await Promise.all([
       supabase.from('clients').select('*').order('created_at', { ascending: false }),
       supabase.from('programs').select('*').order('created_at', { ascending: false }),
       supabase.from('program_registrations').select('*, programs(*)'),
       supabase.from('monthly_reports' as any).select('*'),
+      supabase.from('termination_reports' as any).select('*'),
     ]);
 
     const clientsData = clientsRes.data || [];
