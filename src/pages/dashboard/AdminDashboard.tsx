@@ -14,8 +14,10 @@ interface PegawaiData {
   full_name: string;
   totalClients: number;
   activeClients: number;
-  needsTermination: number; // guidance_end passed but guidance_status still 'aktif'
+  needsTermination: number;
   terminated: number; // guidance_status 'selesai'
+  hasTerminationReport: number; // has filed termination report
+  pendingReport: number; // selesai but no report
   clients: ClientDetail[];
 }
 
