@@ -15,7 +15,7 @@ export default function Navbar() {
     navigate('/');
   };
 
-  const dashboardLink = role === 'pegawai' ? '/dashboard/pegawai' : '/dashboard/klien';
+  const dashboardLink = role === 'admin' ? '/dashboard/admin' : role === 'pegawai' ? '/dashboard/pegawai' : '/dashboard/klien';
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 glass-card">

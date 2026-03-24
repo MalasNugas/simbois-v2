@@ -29,6 +29,7 @@ const App = () => (
             <Route path="/register" element={<Register />} />
             <Route path="/dashboard/klien" element={<KlienDashboard />} />
             <Route path="/dashboard/pegawai" element={<PegawaiDashboard />} />
+            <Route path="/dashboard/admin" element={<AdminDashboard />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>
