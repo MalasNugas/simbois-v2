@@ -317,6 +317,33 @@ export type Database = {
         }
         Relationships: []
       }
+      termination_reports: {
+        Row: {
+          client_id: string
+          created_at: string | null
+          id: string
+          notes: string | null
+          pegawai_id: string
+          report_date: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string | null
+          id?: string
+          notes?: string | null
+          pegawai_id: string
+          report_date?: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string | null
+          id?: string
+          notes?: string | null
+          pegawai_id?: string
+          report_date?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           id: string

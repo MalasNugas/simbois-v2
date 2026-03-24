@@ -14,8 +14,10 @@ interface PegawaiData {
   full_name: string;
   totalClients: number;
   activeClients: number;
-  needsTermination: number; // guidance_end passed but guidance_status still 'aktif'
+  needsTermination: number;
   terminated: number; // guidance_status 'selesai'
+  hasTerminationReport: number; // has filed termination report
+  pendingReport: number; // selesai but no report
   clients: ClientDetail[];
 }
 
@@ -29,6 +31,7 @@ interface ClientDetail {
   guidance_end: string | null;
   client_status: string | null;
   needsTermination: boolean;
+  hasReport: boolean;
 }
 
 export default function AdminDashboard() {
@@ -56,20 +59,15 @@ export default function AdminDashboard() {
   const loadData = async () => {
     setLoading(true);
     try {
-      // Get all pegawai
-      const { data: pegawaiUsers } = await supabase.rpc('get_pegawai_list');
-
-      // Get all clients
-      const { data: allClients } = await supabase
-        .from('clients')
-        .select('*');
-
-      // Get all profiles for client name lookup
-      const { data: allProfiles } = await supabase
-        .from('profiles')
-        .select('user_id, full_name');
+      const [{ data: pegawaiUsers }, { data: allClients }, { data: allProfiles }, { data: termReports }] = await Promise.all([
+        supabase.rpc('get_pegawai_list'),
+        supabase.from('clients').select('*'),
+        supabase.from('profiles').select('user_id, full_name'),
+        supabase.from('termination_reports' as any).select('*'),
+      ]);
 
       const profileMap = new Map(allProfiles?.map(p => [p.user_id, p.full_name]) || []);
+      const termReportClientIds = new Set((termReports || []).map((t: any) => t.client_id));
       const now = new Date();
 
       const pegawaiData: PegawaiData[] = (pegawaiUsers || []).map((p: any) => {
@@ -78,6 +76,7 @@ export default function AdminDashboard() {
         const clientDetails: ClientDetail[] = myClients.map(c => {
           const guidanceEndPassed = c.guidance_end && new Date(c.guidance_end) < now;
           const stillActive = c.guidance_status === 'aktif';
+          const hasReport = termReportClientIds.has(c.user_id);
           return {
             id: c.id,
             user_id: c.user_id,
@@ -88,16 +87,20 @@ export default function AdminDashboard() {
             guidance_end: c.guidance_end,
             client_status: c.client_status,
             needsTermination: !!(guidanceEndPassed && stillActive),
+            hasReport,
           };
         });
 
+        const terminatedClients = myClients.filter(c => c.guidance_status === 'selesai');
         return {
           user_id: p.user_id,
           full_name: p.full_name,
           totalClients: myClients.length,
           activeClients: myClients.filter(c => c.guidance_status === 'aktif').length,
           needsTermination: clientDetails.filter(c => c.needsTermination).length,
-          terminated: myClients.filter(c => c.guidance_status === 'selesai').length,
+          terminated: terminatedClients.length,
+          hasTerminationReport: terminatedClients.filter(c => termReportClientIds.has(c.user_id)).length,
+          pendingReport: terminatedClients.filter(c => !termReportClientIds.has(c.user_id)).length,
           clients: clientDetails,
         };
       });
@@ -113,12 +116,13 @@ export default function AdminDashboard() {
   const totalPegawai = pegawaiList.length;
   const totalNeedsTermination = pegawaiList.reduce((sum, p) => sum + p.needsTermination, 0);
   const totalAllClients = pegawaiList.reduce((sum, p) => sum + p.totalClients, 0);
-  const totalTerminated = pegawaiList.reduce((sum, p) => sum + p.terminated, 0);
+  const totalTerminated = pegawaiList.reduce((sum, p) => sum + p.hasTerminationReport, 0);
+  const totalPendingReport = pegawaiList.reduce((sum, p) => sum + p.pendingReport, 0);
 
   const filteredPegawai = pegawaiList.filter(p => {
     const matchSearch = p.full_name.toLowerCase().includes(searchQuery.toLowerCase());
-    if (filterStatus === 'pending') return matchSearch && p.needsTermination > 0;
-    if (filterStatus === 'done') return matchSearch && p.needsTermination === 0;
+    if (filterStatus === 'pending') return matchSearch && (p.needsTermination > 0 || p.pendingReport > 0);
+    if (filterStatus === 'done') return matchSearch && p.needsTermination === 0 && p.pendingReport === 0;
     return matchSearch;
   });
 
@@ -175,13 +179,23 @@ export default function AdminDashboard() {
           </Card>
           <Card>
             <CardContent className="p-4 flex items-center gap-3">
-              <CheckCircle2 className="w-8 h-8 text-green-500" />
+              <CheckCircle2 className="w-8 h-8 text-green-600" />
               <div>
                 <p className="text-2xl font-bold text-foreground">{totalTerminated}</p>
-                <p className="text-xs text-muted-foreground">Sudah Diakhiri</p>
+                <p className="text-xs text-muted-foreground">Laporan Selesai</p>
               </div>
             </CardContent>
           </Card>
+          {totalPendingReport > 0 && (
+            <Card className="col-span-2 md:col-span-4 border-destructive/30 bg-destructive/5">
+              <CardContent className="p-4 flex items-center gap-3">
+                <Clock className="w-6 h-6 text-destructive" />
+                <p className="text-sm text-destructive font-medium">
+                  {totalPendingReport} klien sudah selesai bimbingan tapi Pegawai PK belum membuat Laporan Pengakhiran
+                </p>
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         {/* Filter & Search */}
@@ -245,6 +259,7 @@ export default function AdminDashboard() {
                     <TableHead className="text-center">Klien Aktif</TableHead>
                     <TableHead className="text-center">Perlu Pengakhiran</TableHead>
                     <TableHead className="text-center">Sudah Diakhiri</TableHead>
+                    <TableHead className="text-center">Laporan Pengakhiran</TableHead>
                     <TableHead className="text-center">Status</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -269,7 +284,17 @@ export default function AdminDashboard() {
                         </TableCell>
                         <TableCell className="text-center">{p.terminated}</TableCell>
                         <TableCell className="text-center">
-                          {p.needsTermination > 0 ? (
+                          {p.hasTerminationReport > 0 ? (
+                            <Badge className="bg-green-600 hover:bg-green-700">{p.hasTerminationReport}</Badge>
+                          ) : (
+                            <span className="text-muted-foreground">0</span>
+                          )}
+                          {p.pendingReport > 0 && (
+                            <Badge variant="destructive" className="ml-1">{p.pendingReport} belum</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          {p.needsTermination > 0 || p.pendingReport > 0 ? (
                             <Badge variant="destructive" className="gap-1">
                               <Clock className="w-3 h-3" /> Belum Lengkap
                             </Badge>
@@ -282,7 +307,7 @@ export default function AdminDashboard() {
                       </TableRow>
                       {expandedPegawai === p.user_id && p.clients.length > 0 && (
                         <TableRow key={`${p.user_id}-detail`}>
-                          <TableCell colSpan={7} className="bg-muted/30 p-0">
+                          <TableCell colSpan={8} className="bg-muted/30 p-0">
                             <div className="p-4">
                               <p className="text-sm font-semibold text-muted-foreground mb-2">Detail Klien - {p.full_name}</p>
                               <Table>
@@ -293,6 +318,7 @@ export default function AdminDashboard() {
                                     <TableHead>Status Klien</TableHead>
                                     <TableHead>Status Bimbingan</TableHead>
                                     <TableHead>Masa Bimbingan</TableHead>
+                                    <TableHead>Laporan Pengakhiran</TableHead>
                                     <TableHead>Keterangan</TableHead>
                                   </TableRow>
                                 </TableHeader>
@@ -315,14 +341,35 @@ export default function AdminDashboard() {
                                           : '-'}
                                       </TableCell>
                                       <TableCell>
+                                        {c.guidance_status === 'selesai' ? (
+                                          c.hasReport ? (
+                                            <Badge className="bg-green-600 hover:bg-green-700 gap-1">
+                                              <CheckCircle2 className="w-3 h-3" /> Sudah
+                                            </Badge>
+                                          ) : (
+                                            <Badge variant="destructive" className="gap-1">
+                                              <Clock className="w-3 h-3" /> Belum Dibuat
+                                            </Badge>
+                                          )
+                                        ) : (
+                                          <span className="text-muted-foreground text-xs">-</span>
+                                        )}
+                                      </TableCell>
+                                      <TableCell>
                                         {c.needsTermination ? (
                                           <Badge variant="destructive" className="gap-1">
                                             <AlertTriangle className="w-3 h-3" /> Perlu Pengakhiran
                                           </Badge>
                                         ) : c.guidance_status === 'selesai' ? (
-                                          <Badge className="bg-green-600 hover:bg-green-700 gap-1">
-                                            <CheckCircle2 className="w-3 h-3" /> Sudah Diakhiri
-                                          </Badge>
+                                          c.hasReport ? (
+                                            <Badge className="bg-green-600 hover:bg-green-700 gap-1">
+                                              <CheckCircle2 className="w-3 h-3" /> Selesai
+                                            </Badge>
+                                          ) : (
+                                            <Badge variant="secondary" className="gap-1">
+                                              <Clock className="w-3 h-3" /> Menunggu Laporan
+                                            </Badge>
+                                          )
                                         ) : (
                                           <span className="text-muted-foreground text-xs">-</span>
                                         )}

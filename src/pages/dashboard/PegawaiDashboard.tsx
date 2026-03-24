@@ -43,17 +43,22 @@ export default function PegawaiDashboard() {
   const [guidanceClient, setGuidanceClient] = useState<any>(null);
   const [guidanceForm, setGuidanceForm] = useState({ guidance_start: '', guidance_end: '' });
   const [monthlyReports, setMonthlyReports] = useState<any[]>([]);
+  const [terminationReports, setTerminationReports] = useState<any[]>([]);
+  const [terminationDialogOpen, setTerminationDialogOpen] = useState(false);
+  const [terminationClient, setTerminationClient] = useState<any>(null);
+  const [terminationNotes, setTerminationNotes] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const editFileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { loadData(); }, []);
 
   const loadData = async () => {
-    const [clientsRes, programsRes, regsRes, reportsRes] = await Promise.all([
+    const [clientsRes, programsRes, regsRes, reportsRes, termRes] = await Promise.all([
       supabase.from('clients').select('*').order('created_at', { ascending: false }),
       supabase.from('programs').select('*').order('created_at', { ascending: false }),
       supabase.from('program_registrations').select('*, programs(*)'),
       supabase.from('monthly_reports' as any).select('*'),
+      supabase.from('termination_reports' as any).select('*'),
     ]);
 
     const clientsData = clientsRes.data || [];
@@ -76,6 +81,7 @@ export default function PegawaiDashboard() {
     setPrograms(programsRes.data || []);
     setRegistrations(regsData);
     setMonthlyReports((reportsRes.data as any[]) || []);
+    setTerminationReports((termRes.data as any[]) || []);
   };
 
   const uploadPdf = async (file: File): Promise<string | null> => {
@@ -187,6 +193,25 @@ export default function PegawaiDashboard() {
     const { error } = await supabase.from('clients').update({ guidance_status: 'selesai' as any }).eq('user_id', userId);
     if (error) toast.error(error.message);
     else { toast.success('Masa bimbingan klien telah diakhiri'); loadData(); }
+  };
+
+  const openTerminationDialog = (client: any) => {
+    setTerminationClient(client);
+    setTerminationNotes('');
+    setTerminationDialogOpen(true);
+  };
+
+  const submitTerminationReport = async () => {
+    if (!terminationClient) return;
+    const { error } = await supabase.from('termination_reports' as any).insert({
+      client_id: terminationClient.user_id,
+      pegawai_id: user!.id,
+      notes: terminationNotes || null,
+    });
+    if (error) { toast.error(error.message); return; }
+    toast.success('Laporan pengakhiran berhasil dibuat');
+    setTerminationDialogOpen(false);
+    loadData();
   };
 
   const createProgram = async () => {
@@ -596,6 +621,16 @@ export default function PegawaiDashboard() {
                             {c.guidance_end && new Date(c.guidance_end) <= new Date() && c.guidance_status === 'aktif' && (
                               <Button size="sm" variant="destructive" onClick={() => endGuidance(c.user_id)}>Akhiri</Button>
                             )}
+                            {c.guidance_status === 'selesai' && !terminationReports.some(t => t.client_id === c.user_id) && (
+                              <Button size="sm" variant="outline" onClick={() => openTerminationDialog(c)} className="text-destructive border-destructive/50">
+                                <FileText className="w-3 h-3 mr-1" /> Laporan Pengakhiran
+                              </Button>
+                            )}
+                            {terminationReports.some(t => t.client_id === c.user_id) && (
+                              <Badge className="bg-green-600 hover:bg-green-700 gap-1">
+                                <CheckCircle className="w-3 h-3" /> Sudah Dilaporkan
+                              </Badge>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -663,6 +698,28 @@ export default function PegawaiDashboard() {
                 <Input type="date" value={guidanceForm.guidance_end} onChange={e => setGuidanceForm(f => ({ ...f, guidance_end: e.target.value }))} />
               </div>
               <Button onClick={saveGuidancePeriod} className="w-full">Simpan</Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Termination Report Dialog */}
+        <Dialog open={terminationDialogOpen} onOpenChange={setTerminationDialogOpen}>
+          <DialogContent className="bg-card border-border">
+            <DialogHeader><DialogTitle>Laporan Pengakhiran</DialogTitle></DialogHeader>
+            <p className="text-sm text-muted-foreground mb-2">
+              Klien: <strong>{(terminationClient as any)?.profile?.full_name}</strong>
+            </p>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Catatan Pengakhiran</Label>
+                <Textarea
+                  value={terminationNotes}
+                  onChange={e => setTerminationNotes(e.target.value)}
+                  placeholder="Tuliskan catatan laporan pengakhiran bimbingan..."
+                  rows={4}
+                />
+              </div>
+              <Button onClick={submitTerminationReport} className="w-full">Simpan Laporan</Button>
             </div>
           </DialogContent>
         </Dialog>
