@@ -24,7 +24,9 @@ export default function Login() {
       // Role will be fetched by AuthProvider, redirect based on role
       const { data: { user } } = await supabase.auth.getUser();
       const { data } = await supabase.from('user_roles').select('role').eq('user_id', user!.id).maybeSingle();
-      if (data?.role === 'pegawai') {
+      if (data?.role === 'admin') {
+        navigate('/dashboard/admin');
+      } else if (data?.role === 'pegawai') {
         navigate('/dashboard/pegawai');
       } else {
         navigate('/dashboard/klien');
