@@ -284,7 +284,17 @@ export default function AdminDashboard() {
                         </TableCell>
                         <TableCell className="text-center">{p.terminated}</TableCell>
                         <TableCell className="text-center">
-                          {p.needsTermination > 0 ? (
+                          {p.hasTerminationReport > 0 ? (
+                            <Badge className="bg-green-600 hover:bg-green-700">{p.hasTerminationReport}</Badge>
+                          ) : (
+                            <span className="text-muted-foreground">0</span>
+                          )}
+                          {p.pendingReport > 0 && (
+                            <Badge variant="destructive" className="ml-1">{p.pendingReport} belum</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          {p.needsTermination > 0 || p.pendingReport > 0 ? (
                             <Badge variant="destructive" className="gap-1">
                               <Clock className="w-3 h-3" /> Belum Lengkap
                             </Badge>
