@@ -10,6 +10,7 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import KlienDashboard from "./pages/dashboard/KlienDashboard";
 import PegawaiDashboard from "./pages/dashboard/PegawaiDashboard";
+import AdminDashboard from "./pages/dashboard/AdminDashboard";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -28,6 +29,7 @@ const App = () => (
             <Route path="/register" element={<Register />} />
             <Route path="/dashboard/klien" element={<KlienDashboard />} />
             <Route path="/dashboard/pegawai" element={<PegawaiDashboard />} />
+            <Route path="/dashboard/admin" element={<AdminDashboard />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>
