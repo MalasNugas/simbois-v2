@@ -59,10 +59,10 @@ export default function AdminDashboard() {
       // Get all pegawai
       const { data: pegawaiUsers } = await supabase.rpc('get_pegawai_list');
 
-      // Get all clients with profiles
+      // Get all clients
       const { data: allClients } = await supabase
         .from('clients')
-        .select('*, profiles!clients_user_id_fkey(full_name)');
+        .select('*');
 
       // Get all profiles for client name lookup
       const { data: allProfiles } = await supabase
