@@ -47,6 +47,23 @@ export default function PegawaiDashboard() {
   const [terminationDialogOpen, setTerminationDialogOpen] = useState(false);
   const [terminationClient, setTerminationClient] = useState<any>(null);
   const [terminationNotes, setTerminationNotes] = useState('');
+  const [laporanDialogOpen, setLaporanDialogOpen] = useState(false);
+  const [laporanClient, setLaporanClient] = useState<any>(null);
+  const [laporanForm, setLaporanForm] = useState({
+    agama: 'Islam',
+    jenis_bimbingan: 'Kepribadian dan Pengawasan',
+    bimbingan_ke: '1',
+    tanggal_pelaksanaan: '',
+    jam_mulai: '',
+    jam_selesai: '',
+    tempat: '',
+    judul_materi: '',
+    isi_materi: '',
+    saran: '',
+    kepala_nama: '',
+    status_klien: 'CUTI BERSYARAT',
+    nomor_surat: '',
+  });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const editFileInputRef = useRef<HTMLInputElement>(null);
 
