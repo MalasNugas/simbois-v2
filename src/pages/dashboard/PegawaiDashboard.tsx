@@ -919,6 +919,86 @@ export default function PegawaiDashboard() {
             </div>
           </DialogContent>
         </Dialog>
+
+        {/* Laporan Bimbingan Dialog */}
+        <Dialog open={laporanDialogOpen} onOpenChange={setLaporanDialogOpen}>
+          <DialogContent className="bg-card border-border max-h-[85vh] overflow-y-auto max-w-lg">
+            <DialogHeader><DialogTitle>Generate Laporan Bimbingan</DialogTitle></DialogHeader>
+            <p className="text-sm text-muted-foreground mb-2">
+              Klien: <strong>{(laporanClient as any)?.profile?.full_name}</strong>
+            </p>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs">Status Klien</Label>
+                  <Input value={laporanForm.status_klien} onChange={e => setLaporanForm(f => ({ ...f, status_klien: e.target.value }))} placeholder="CUTI BERSYARAT" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Nomor Surat</Label>
+                  <Input value={laporanForm.nomor_surat} onChange={e => setLaporanForm(f => ({ ...f, nomor_surat: e.target.value }))} placeholder="WP.15.PAS..." />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs">Agama</Label>
+                  <Select value={laporanForm.agama} onValueChange={v => setLaporanForm(f => ({ ...f, agama: v }))}>
+                    <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {['Islam', 'Kristen', 'Katolik', 'Hindu', 'Buddha', 'Konghucu'].map(a => (
+                        <SelectItem key={a} value={a}>{a}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Bimbingan ke</Label>
+                  <Input value={laporanForm.bimbingan_ke} onChange={e => setLaporanForm(f => ({ ...f, bimbingan_ke: e.target.value }))} />
+                </div>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Jenis Bimbingan</Label>
+                <Input value={laporanForm.jenis_bimbingan} onChange={e => setLaporanForm(f => ({ ...f, jenis_bimbingan: e.target.value }))} />
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs">Tanggal Pelaksanaan</Label>
+                  <Input type="date" value={laporanForm.tanggal_pelaksanaan} onChange={e => setLaporanForm(f => ({ ...f, tanggal_pelaksanaan: e.target.value }))} />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Jam Mulai</Label>
+                  <Input type="time" value={laporanForm.jam_mulai} onChange={e => setLaporanForm(f => ({ ...f, jam_mulai: e.target.value }))} />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Jam Selesai</Label>
+                  <Input type="time" value={laporanForm.jam_selesai} onChange={e => setLaporanForm(f => ({ ...f, jam_selesai: e.target.value }))} />
+                </div>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Tempat Pelaksanaan</Label>
+                <Input value={laporanForm.tempat} onChange={e => setLaporanForm(f => ({ ...f, tempat: e.target.value }))} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Judul Materi</Label>
+                <Input value={laporanForm.judul_materi} onChange={e => setLaporanForm(f => ({ ...f, judul_materi: e.target.value }))} placeholder="Kewajiban klien dalam menjalani..." />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Isi Materi</Label>
+                <Textarea value={laporanForm.isi_materi} onChange={e => setLaporanForm(f => ({ ...f, isi_materi: e.target.value }))} rows={5} placeholder="Tuliskan isi materi bimbingan..." />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Saran</Label>
+                <Textarea value={laporanForm.saran} onChange={e => setLaporanForm(f => ({ ...f, saran: e.target.value }))} rows={3} placeholder="Tuliskan saran..." />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Nama Kepala Bapas</Label>
+                <Input value={laporanForm.kepala_nama} onChange={e => setLaporanForm(f => ({ ...f, kepala_nama: e.target.value }))} placeholder="Nama Kepala Bapas" />
+              </div>
+              <Button onClick={generateLaporanBimbinganPdf} className="w-full gap-2">
+                <Download className="w-4 h-4" /> Generate PDF
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
 
       {/* Floating Chat Widget */}
