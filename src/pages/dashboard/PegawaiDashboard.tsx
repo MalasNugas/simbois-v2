@@ -325,15 +325,15 @@ export default function PegawaiDashboard() {
       ['Tempat dilaksanakan', laporanForm.tempat, false],
     ];
 
-    const labelX = margin + 5;
-    const colonX = margin + 62;
-    const valueX = margin + 65;
+    const labelX = margin + 12;
+    const colonX = margin + 65;
+    const valueX = margin + 68;
     const maxValueW = pw - margin - valueX;
 
     identityItems.forEach(([label, value, isBold], i) => {
-      const num = i < 9 ? `${i + 1}.` : `${i + 1}.`;
+      const num = `${i + 1}.`;
       doc.setFont('helvetica', 'normal');
-      doc.text(num, margin, y);
+      doc.text(num, margin + 5, y);
       doc.text(label, labelX, y);
       doc.text(':', colonX, y);
       doc.setFont('helvetica', isBold ? 'bold' : 'normal');
@@ -341,38 +341,39 @@ export default function PegawaiDashboard() {
       doc.text(lines, valueX, y);
       y += lines.length * 5;
     });
-    y += 6;
+    y += 8;
 
     // II. MATERI BIMBINGAN
     doc.setFontSize(10);
     doc.setFont('helvetica', 'bold');
-    doc.text('II. MATERI BIMBINGAN', margin, y);
+    doc.text('II.', margin, y);
+    doc.text('MATERI BIMBINGAN', margin + 8, y);
     y += 7;
 
     doc.setFontSize(9);
     doc.setFont('helvetica', 'normal');
     const jenisBimbLabel = laporanForm.jenis_bimbingan.includes('Kemandirian') ? 'Bimbingan Kemandirian' : 'Bimbingan Kepribadian';
-    doc.text(jenisBimbLabel, margin + 5, y);
+    doc.text(jenisBimbLabel, margin + 12, y);
+    y += 6;
+    doc.text('Judul Materi : ' + laporanForm.judul_materi, margin + 12, y);
+    y += 6;
+    doc.text('Isi Materi :', margin + 12, y);
     y += 5;
-    doc.setFont('helvetica', 'bold');
-    doc.text(`Judul Materi : ${laporanForm.judul_materi}`, margin + 5, y);
-    y += 5;
-    doc.setFont('helvetica', 'italic');
-    doc.text('Isi Materi:', margin + 5, y);
-    y += 5;
-    doc.setFont('helvetica', 'normal');
 
-    // Split isi_materi by newlines for bullet support
+    // Split isi_materi by newlines for dash bullet support
     const materiParagraphs = (laporanForm.isi_materi || '-').split('\n');
     materiParagraphs.forEach((para: string) => {
       const trimmed = para.trim();
       if (!trimmed) { y += 3; return; }
-      const prefix = trimmed.startsWith('•') || trimmed.startsWith('-') ? '' : '• ';
-      const text = prefix ? `${prefix}${trimmed}` : trimmed;
-      const lines = doc.splitTextToSize(text, pw - margin * 2 - 12);
+      const isSubItem = /^[a-z]\.\s/.test(trimmed);
+      const hasBullet = trimmed.startsWith('-') || trimmed.startsWith('•');
+      const prefix = isSubItem ? '     ' : (hasBullet ? '' : '-  ');
+      const text = hasBullet ? trimmed.replace(/^[-•]\s*/, '-  ') : `${prefix}${trimmed}`;
+      const indentX = isSubItem ? margin + 20 : margin + 14;
+      const lines = doc.splitTextToSize(text, pw - margin - indentX);
       lines.forEach((line: string) => {
         if (y > 270) { doc.addPage(); y = 20; }
-        doc.text(line, margin + 7, y);
+        doc.text(line, indentX, y);
         y += 4.5;
       });
     });
