@@ -805,6 +805,9 @@ export default function PegawaiDashboard() {
                         <td className="py-3">{(c as any).profile?.is_verified ? <Badge variant="default">✓</Badge> : <Badge variant="secondary">✗</Badge>}</td>
                         <td className="py-3">
                           <div className="flex gap-1 flex-wrap">
+                            <Button size="sm" variant="outline" onClick={() => openLaporanDialog(c)} title="Generate Laporan Bimbingan">
+                              <FileText className="w-3 h-3 mr-1" /> Laporan
+                            </Button>
                             <Button size="sm" variant="outline" onClick={() => openGuidanceDialog(c)} title="Atur Masa Bimbingan">
                               <CalendarDays className="w-3 h-3 mr-1" /> Masa
                             </Button>
