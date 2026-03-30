@@ -258,52 +258,47 @@ export default function PegawaiDashboard() {
     let y = 18;
 
     // Header - KOP SURAT
-    doc.setFontSize(10);
+    doc.setFontSize(9);
     doc.setFont('helvetica', 'bold');
     doc.text('KEMENTERIAN IMIGRASI DAN PEMASYARAKATAN REPUBLIK INDONESIA', pw / 2, y, { align: 'center' });
-    y += 5;
+    y += 4;
     doc.text('DIREKTORAT JENDERAL PEMASYARAKATAN', pw / 2, y, { align: 'center' });
-    y += 5;
+    y += 4;
     doc.text('KANTOR WILAYAH JAWA TIMUR', pw / 2, y, { align: 'center' });
     y += 5;
-    doc.setFontSize(11);
+    doc.setFontSize(10);
     doc.text('BALAI PEMASYARAKATAN KELAS I MALANG', pw / 2, y, { align: 'center' });
     y += 5;
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(7);
+    doc.setFontSize(8);
     doc.text('Jalan Barito No. 1, Bunulrejo, Blimbing, Malang', pw / 2, y, { align: 'center' });
-    y += 3;
-    doc.setFont('helvetica', 'italic');
-    doc.text('Laman: , Pos-el: ', pw / 2, y, { align: 'center' });
     y += 4;
+    doc.text('Laman: https://bapasmalang.kemenkumham.go.id, Pos-el : bapasmalang@gmail.com', pw / 2, y, { align: 'center' });
+    y += 3;
 
     // Double line
-    doc.setLineWidth(1);
+    doc.setLineWidth(0.8);
     doc.line(margin, y, pw - margin, y);
-    y += 1.5;
+    y += 1.2;
     doc.setLineWidth(0.3);
     doc.line(margin, y, pw - margin, y);
     y += 10;
 
     // Title block
-    doc.setFontSize(11);
-    doc.setFont('helvetica', 'bold');
-    doc.text('LAPORAN HASIL BIMBINGAN DAN PENGAWASAN KLIEN', pw / 2, y, { align: 'center' });
-    y += 6;
     doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.text('LAPORAN HASIL BIMBINGAN  DAN  PENGAWASAN KLIEN', pw / 2, y, { align: 'center' });
+    y += 5;
     doc.text(`STATUS KLIEN : ${laporanForm.status_klien}`, pw / 2, y, { align: 'center' });
     y += 5;
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(9);
-    if (laporanForm.nomor_surat) {
-      doc.text(`Nomor: ${laporanForm.nomor_surat}`, pw / 2, y, { align: 'center' });
-    }
+    doc.text(`Nomor : ${laporanForm.nomor_surat || 'WP.15.PAS.15.PK.06.03 - ........'}`, pw / 2, y, { align: 'center' });
     y += 10;
 
     // I. IDENTITAS
     doc.setFontSize(10);
     doc.setFont('helvetica', 'bold');
-    doc.text('I. IDENTITAS', margin, y);
+    doc.text('I.', margin, y);
+    doc.text('IDENTITAS', margin + 8, y);
     y += 7;
 
     doc.setFont('helvetica', 'normal');
@@ -330,15 +325,15 @@ export default function PegawaiDashboard() {
       ['Tempat dilaksanakan', laporanForm.tempat, false],
     ];
 
-    const labelX = margin + 5;
-    const colonX = margin + 62;
-    const valueX = margin + 65;
+    const labelX = margin + 12;
+    const colonX = margin + 65;
+    const valueX = margin + 68;
     const maxValueW = pw - margin - valueX;
 
     identityItems.forEach(([label, value, isBold], i) => {
-      const num = i < 9 ? `${i + 1}.` : `${i + 1}.`;
+      const num = `${i + 1}.`;
       doc.setFont('helvetica', 'normal');
-      doc.text(num, margin, y);
+      doc.text(num, margin + 5, y);
       doc.text(label, labelX, y);
       doc.text(':', colonX, y);
       doc.setFont('helvetica', isBold ? 'bold' : 'normal');
@@ -346,57 +341,59 @@ export default function PegawaiDashboard() {
       doc.text(lines, valueX, y);
       y += lines.length * 5;
     });
-    y += 6;
+    y += 8;
 
     // II. MATERI BIMBINGAN
     doc.setFontSize(10);
     doc.setFont('helvetica', 'bold');
-    doc.text('II. MATERI BIMBINGAN', margin, y);
+    doc.text('II.', margin, y);
+    doc.text('MATERI BIMBINGAN', margin + 8, y);
     y += 7;
 
     doc.setFontSize(9);
     doc.setFont('helvetica', 'normal');
     const jenisBimbLabel = laporanForm.jenis_bimbingan.includes('Kemandirian') ? 'Bimbingan Kemandirian' : 'Bimbingan Kepribadian';
-    doc.text(jenisBimbLabel, margin + 5, y);
+    doc.text(jenisBimbLabel, margin + 12, y);
+    y += 6;
+    doc.text('Judul Materi : ' + laporanForm.judul_materi, margin + 12, y);
+    y += 6;
+    doc.text('Isi Materi :', margin + 12, y);
     y += 5;
-    doc.setFont('helvetica', 'bold');
-    doc.text(`Judul Materi : ${laporanForm.judul_materi}`, margin + 5, y);
-    y += 5;
-    doc.setFont('helvetica', 'italic');
-    doc.text('Isi Materi:', margin + 5, y);
-    y += 5;
-    doc.setFont('helvetica', 'normal');
 
-    // Split isi_materi by newlines for bullet support
+    // Split isi_materi by newlines for dash bullet support
     const materiParagraphs = (laporanForm.isi_materi || '-').split('\n');
     materiParagraphs.forEach((para: string) => {
       const trimmed = para.trim();
       if (!trimmed) { y += 3; return; }
-      const prefix = trimmed.startsWith('•') || trimmed.startsWith('-') ? '' : '• ';
-      const text = prefix ? `${prefix}${trimmed}` : trimmed;
-      const lines = doc.splitTextToSize(text, pw - margin * 2 - 12);
+      const isSubItem = /^[a-z]\.\s/.test(trimmed);
+      const hasBullet = trimmed.startsWith('-') || trimmed.startsWith('•');
+      const prefix = isSubItem ? '     ' : (hasBullet ? '' : '-  ');
+      const text = hasBullet ? trimmed.replace(/^[-•]\s*/, '-  ') : `${prefix}${trimmed}`;
+      const indentX = isSubItem ? margin + 20 : margin + 14;
+      const lines = doc.splitTextToSize(text, pw - margin - indentX);
       lines.forEach((line: string) => {
         if (y > 270) { doc.addPage(); y = 20; }
-        doc.text(line, margin + 7, y);
+        doc.text(line, indentX, y);
         y += 4.5;
       });
     });
     y += 6;
 
-    // III. SARAN (template-based, not manual)
+    // III. SARAN (template-based)
     if (y > 240) { doc.addPage(); y = 20; }
     doc.setFontSize(10);
     doc.setFont('helvetica', 'bold');
-    doc.text('III. SARAN', margin, y);
+    doc.text('III.', margin, y);
+    doc.text('SARAN', margin + 8, y);
     y += 7;
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(9);
 
     const saranItems = [
       'Mengingatkan klien untuk mentaati norma-norma hukum dan agama;',
-      'Menyarankan klien untuk meningkatkan ketaqwaan kepada Tuhan Yang Maha Esa;',
-      'Mengingatkan klien untuk tidak lupa melaksanakan wajib lapor setiap bulannya;',
-      'Memberikan semangat kepada klien dalam melaksanakan pekerjaannya sehari-hari.',
+      'Menyarankan klien untuk meningkatkan ketaqwaan kepada Tuhan Yang Maha Esa',
+      'Mengingatkan klien untuk tidak lupa melaksanakan wajib lapor setiap bulannya',
+      'Memberikan semangat kepada klien dalam melaksanakan pekerjaannya sehari-hari',
     ];
 
     saranItems.forEach((saran, i) => {
@@ -406,24 +403,28 @@ export default function PegawaiDashboard() {
       doc.text(lines, margin + 12, y);
       y += lines.length * 4.5 + 1;
     });
-    y += 10;
+    y += 12;
 
     // Signatures
     if (y > 230) { doc.addPage(); y = 20; }
     const tglLaporan = laporanForm.tanggal_pelaksanaan
-      ? format(new Date(laporanForm.tanggal_pelaksanaan), 'dd MMMM yyyy')
-      : format(new Date(), 'dd MMMM yyyy');
+      ? format(new Date(laporanForm.tanggal_pelaksanaan), 'd MMMM yyyy')
+      : format(new Date(), 'd MMMM yyyy');
 
-    const sigRightX = pw - margin - 65;
+    const sigLeftX = margin + 5;
+    const sigRightX = pw / 2 + 15;
     doc.setFontSize(9);
-    doc.text('Mengetahui :', margin, y);
+    doc.setFont('helvetica', 'normal');
     doc.text(`Malang, ${tglLaporan}`, sigRightX, y);
-    y += 5;
-    doc.text('Kepala,', margin, y);
+    y += 6;
+    doc.text('Mengetahui :', sigLeftX, y);
     doc.text('Pembimbing Kemasyarakatan Muda,', sigRightX, y);
-    y += 28;
+    y += 5;
+    doc.text('Kepala,', sigLeftX, y);
+    y += 30;
     doc.setFont('helvetica', 'bold');
-    doc.text(laporanForm.kepala_nama || '............................', margin, y);
+    const kepalaName = laporanForm.kepala_nama || '............................';
+    doc.text(kepalaName, sigLeftX, y);
     doc.text(pkProfile?.full_name || '-', sigRightX, y);
 
     const clientName = (profile?.full_name || 'klien').replace(/\s+/g, '_');
