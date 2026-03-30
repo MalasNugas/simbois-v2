@@ -379,20 +379,21 @@ export default function PegawaiDashboard() {
     });
     y += 6;
 
-    // III. SARAN (template-based, not manual)
+    // III. SARAN (template-based)
     if (y > 240) { doc.addPage(); y = 20; }
     doc.setFontSize(10);
     doc.setFont('helvetica', 'bold');
-    doc.text('III. SARAN', margin, y);
+    doc.text('III.', margin, y);
+    doc.text('SARAN', margin + 8, y);
     y += 7;
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(9);
 
     const saranItems = [
       'Mengingatkan klien untuk mentaati norma-norma hukum dan agama;',
-      'Menyarankan klien untuk meningkatkan ketaqwaan kepada Tuhan Yang Maha Esa;',
-      'Mengingatkan klien untuk tidak lupa melaksanakan wajib lapor setiap bulannya;',
-      'Memberikan semangat kepada klien dalam melaksanakan pekerjaannya sehari-hari.',
+      'Menyarankan klien untuk meningkatkan ketaqwaan kepada Tuhan Yang Maha Esa',
+      'Mengingatkan klien untuk tidak lupa melaksanakan wajib lapor setiap bulannya',
+      'Memberikan semangat kepada klien dalam melaksanakan pekerjaannya sehari-hari',
     ];
 
     saranItems.forEach((saran, i) => {
@@ -402,24 +403,28 @@ export default function PegawaiDashboard() {
       doc.text(lines, margin + 12, y);
       y += lines.length * 4.5 + 1;
     });
-    y += 10;
+    y += 12;
 
     // Signatures
     if (y > 230) { doc.addPage(); y = 20; }
     const tglLaporan = laporanForm.tanggal_pelaksanaan
-      ? format(new Date(laporanForm.tanggal_pelaksanaan), 'dd MMMM yyyy')
-      : format(new Date(), 'dd MMMM yyyy');
+      ? format(new Date(laporanForm.tanggal_pelaksanaan), 'd MMMM yyyy')
+      : format(new Date(), 'd MMMM yyyy');
 
-    const sigRightX = pw - margin - 65;
+    const sigLeftX = margin + 5;
+    const sigRightX = pw / 2 + 15;
     doc.setFontSize(9);
-    doc.text('Mengetahui :', margin, y);
+    doc.setFont('helvetica', 'normal');
     doc.text(`Malang, ${tglLaporan}`, sigRightX, y);
-    y += 5;
-    doc.text('Kepala,', margin, y);
+    y += 6;
+    doc.text('Mengetahui :', sigLeftX, y);
     doc.text('Pembimbing Kemasyarakatan Muda,', sigRightX, y);
-    y += 28;
+    y += 5;
+    doc.text('Kepala,', sigLeftX, y);
+    y += 30;
     doc.setFont('helvetica', 'bold');
-    doc.text(laporanForm.kepala_nama || '............................', margin, y);
+    const kepalaName = laporanForm.kepala_nama || '............................';
+    doc.text(kepalaName, sigLeftX, y);
     doc.text(pkProfile?.full_name || '-', sigRightX, y);
 
     const clientName = (profile?.full_name || 'klien').replace(/\s+/g, '_');
