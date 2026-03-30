@@ -258,52 +258,47 @@ export default function PegawaiDashboard() {
     let y = 18;
 
     // Header - KOP SURAT
-    doc.setFontSize(10);
+    doc.setFontSize(9);
     doc.setFont('helvetica', 'bold');
     doc.text('KEMENTERIAN IMIGRASI DAN PEMASYARAKATAN REPUBLIK INDONESIA', pw / 2, y, { align: 'center' });
-    y += 5;
+    y += 4;
     doc.text('DIREKTORAT JENDERAL PEMASYARAKATAN', pw / 2, y, { align: 'center' });
-    y += 5;
+    y += 4;
     doc.text('KANTOR WILAYAH JAWA TIMUR', pw / 2, y, { align: 'center' });
     y += 5;
-    doc.setFontSize(11);
+    doc.setFontSize(10);
     doc.text('BALAI PEMASYARAKATAN KELAS I MALANG', pw / 2, y, { align: 'center' });
     y += 5;
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(7);
+    doc.setFontSize(8);
     doc.text('Jalan Barito No. 1, Bunulrejo, Blimbing, Malang', pw / 2, y, { align: 'center' });
-    y += 3;
-    doc.setFont('helvetica', 'italic');
-    doc.text('Laman: , Pos-el: ', pw / 2, y, { align: 'center' });
     y += 4;
+    doc.text('Laman: https://bapasmalang.kemenkumham.go.id, Pos-el : bapasmalang@gmail.com', pw / 2, y, { align: 'center' });
+    y += 3;
 
     // Double line
-    doc.setLineWidth(1);
+    doc.setLineWidth(0.8);
     doc.line(margin, y, pw - margin, y);
-    y += 1.5;
+    y += 1.2;
     doc.setLineWidth(0.3);
     doc.line(margin, y, pw - margin, y);
     y += 10;
 
     // Title block
-    doc.setFontSize(11);
-    doc.setFont('helvetica', 'bold');
-    doc.text('LAPORAN HASIL BIMBINGAN DAN PENGAWASAN KLIEN', pw / 2, y, { align: 'center' });
-    y += 6;
     doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.text('LAPORAN HASIL BIMBINGAN  DAN  PENGAWASAN KLIEN', pw / 2, y, { align: 'center' });
+    y += 5;
     doc.text(`STATUS KLIEN : ${laporanForm.status_klien}`, pw / 2, y, { align: 'center' });
     y += 5;
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(9);
-    if (laporanForm.nomor_surat) {
-      doc.text(`Nomor: ${laporanForm.nomor_surat}`, pw / 2, y, { align: 'center' });
-    }
+    doc.text(`Nomor : ${laporanForm.nomor_surat || 'WP.15.PAS.15.PK.06.03 - ........'}`, pw / 2, y, { align: 'center' });
     y += 10;
 
     // I. IDENTITAS
     doc.setFontSize(10);
     doc.setFont('helvetica', 'bold');
-    doc.text('I. IDENTITAS', margin, y);
+    doc.text('I.', margin, y);
+    doc.text('IDENTITAS', margin + 8, y);
     y += 7;
 
     doc.setFont('helvetica', 'normal');
