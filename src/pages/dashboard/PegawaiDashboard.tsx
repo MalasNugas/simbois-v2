@@ -231,6 +231,182 @@ export default function PegawaiDashboard() {
     loadData();
   };
 
+  const openLaporanDialog = (client: any) => {
+    setLaporanClient(client);
+    setLaporanForm({
+      agama: 'Islam',
+      jenis_bimbingan: 'Kepribadian dan Pengawasan',
+      bimbingan_ke: '1',
+      tanggal_pelaksanaan: format(new Date(), 'yyyy-MM-dd'),
+      jam_mulai: '09:00',
+      jam_selesai: '10:00',
+      tempat: (client as any).profile?.address || '',
+      judul_materi: '',
+      isi_materi: '',
+      saran: '',
+      kepala_nama: '',
+      status_klien: 'CUTI BERSYARAT',
+      nomor_surat: '',
+    });
+    setLaporanDialogOpen(true);
+  };
+
+  const generateLaporanBimbinganPdf = async () => {
+    if (!laporanClient) return;
+    const profile = (laporanClient as any).profile;
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const pw = doc.internal.pageSize.getWidth();
+    const margin = 20;
+    let y = 15;
+
+    // Header
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'bold');
+    doc.text('KEMENTERIAN IMIGRASI DAN PEMASYARAKATAN REPUBLIK INDONESIA', pw / 2, y, { align: 'center' });
+    y += 5;
+    doc.text('DIREKTORAT JENDERAL PEMASYARAKATAN', pw / 2, y, { align: 'center' });
+    y += 5;
+    doc.text('KANTOR WILAYAH JAWA TIMUR', pw / 2, y, { align: 'center' });
+    y += 5;
+    doc.text('BALAI PEMASYARAKATAN KELAS I MALANG', pw / 2, y, { align: 'center' });
+    y += 5;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+    doc.text('Jalan Barito No. 1, Bunulrejo, Blimbing, Malang', pw / 2, y, { align: 'center' });
+    y += 4;
+
+    // Line
+    doc.setLineWidth(0.8);
+    doc.line(margin, y, pw - margin, y);
+    y += 2;
+    doc.setLineWidth(0.3);
+    doc.line(margin, y, pw - margin, y);
+    y += 8;
+
+    // Title
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.text('LAPORAN HASIL BIMBINGAN DAN PENGAWASAN KLIEN', pw / 2, y, { align: 'center' });
+    y += 6;
+    doc.setFontSize(10);
+    doc.text(`STATUS KLIEN : ${laporanForm.status_klien}`, pw / 2, y, { align: 'center' });
+    y += 5;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    if (laporanForm.nomor_surat) {
+      doc.text(`Nomor: ${laporanForm.nomor_surat}`, pw / 2, y, { align: 'center' });
+    }
+    y += 8;
+
+    // I. IDENTITAS
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.text('I. IDENTITAS', margin, y);
+    y += 6;
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    const masaBimbingan = laporanClient.guidance_start && laporanClient.guidance_end
+      ? `${format(new Date(laporanClient.guidance_start), 'dd/MM/yyyy')} s.d. ${format(new Date(laporanClient.guidance_end), 'dd/MM/yyyy')}`
+      : '-';
+    const tanggalJam = laporanForm.tanggal_pelaksanaan
+      ? `${format(new Date(laporanForm.tanggal_pelaksanaan), 'dd MMMM yyyy')} / Pukul ${laporanForm.jam_mulai}-${laporanForm.jam_selesai} WIB`
+      : '-';
+
+    const identityItems = [
+      ['Nama Klien', (profile?.full_name || '-').toUpperCase()],
+      ['Nomor Register Bapas', laporanClient.case_number || '-'],
+      ['Masa Bimbingan', masaBimbingan],
+      ['Jenis Kelamin', profile?.gender === 'L' ? 'Laki-laki' : profile?.gender === 'P' ? 'Perempuan' : profile?.gender || '-'],
+      ['Agama', laporanForm.agama],
+      ['Jenis Bimbingan', laporanForm.jenis_bimbingan],
+      ['Bimbingan ke', laporanForm.bimbingan_ke],
+      ['Pembimbing Kemasyarakatan', '-'],
+      ['Tanggal / Jam Pelaksanaan', tanggalJam],
+      ['Tempat dilaksanakan', laporanForm.tempat],
+    ];
+
+    // Get PK name
+    const { data: pkProfile } = await supabase.from('profiles').select('full_name').eq('user_id', user!.id).maybeSingle();
+    identityItems[7][1] = (pkProfile?.full_name || '-').toUpperCase();
+
+    const labelX = margin + 3;
+    const colonX = margin + 62;
+    const valueX = margin + 65;
+
+    identityItems.forEach(([label, value], i) => {
+      doc.text(`${i + 1}.`, margin, y);
+      doc.text(label, labelX, y);
+      doc.text(':', colonX, y);
+      const lines = doc.splitTextToSize(value, pw - margin - valueX);
+      doc.text(lines, valueX, y);
+      y += lines.length * 4.5;
+    });
+    y += 4;
+
+    // II. MATERI BIMBINGAN
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.text('II. MATERI BIMBINGAN', margin, y);
+    y += 6;
+
+    doc.setFontSize(9);
+    doc.text('Bimbingan Kepribadian', margin + 3, y);
+    y += 5;
+    doc.text(`Judul Materi : ${laporanForm.judul_materi}`, margin + 3, y);
+    y += 5;
+    doc.setFont('helvetica', 'italic');
+    doc.text('Isi Materi:', margin + 3, y);
+    y += 5;
+    doc.setFont('helvetica', 'normal');
+    const materiLines = doc.splitTextToSize(laporanForm.isi_materi || '-', pw - margin * 2 - 6);
+    materiLines.forEach((line: string) => {
+      if (y > 270) { doc.addPage(); y = 20; }
+      doc.text(line, margin + 5, y);
+      y += 4.5;
+    });
+    y += 4;
+
+    // III. SARAN
+    if (y > 250) { doc.addPage(); y = 20; }
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.text('III. SARAN', margin, y);
+    y += 6;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    const saranLines = doc.splitTextToSize(laporanForm.saran || '-', pw - margin * 2 - 6);
+    saranLines.forEach((line: string, i: number) => {
+      if (y > 270) { doc.addPage(); y = 20; }
+      doc.text(line, margin + 5, y);
+      y += 4.5;
+    });
+    y += 10;
+
+    // Signatures
+    if (y > 230) { doc.addPage(); y = 20; }
+    const tglLaporan = laporanForm.tanggal_pelaksanaan
+      ? format(new Date(laporanForm.tanggal_pelaksanaan), 'dd MMMM yyyy')
+      : format(new Date(), 'dd MMMM yyyy');
+
+    // Left: Kepala
+    doc.setFontSize(9);
+    doc.text('Mengetahui :', margin, y);
+    doc.text(`Malang, ${tglLaporan}`, pw - margin - 60, y);
+    y += 5;
+    doc.text('Kepala,', margin, y);
+    doc.text('Pembimbing Kemasyarakatan,', pw - margin - 60, y);
+    y += 25;
+    doc.setFont('helvetica', 'bold');
+    doc.text(laporanForm.kepala_nama || '............................', margin, y);
+    doc.text(pkProfile?.full_name || '-', pw - margin - 60, y);
+
+    const clientName = (profile?.full_name || 'klien').replace(/\s+/g, '_');
+    doc.save(`Laporan_Bimbingan_${clientName}_${format(new Date(), 'yyyy-MM-dd')}.pdf`);
+    toast.success('PDF Laporan Bimbingan berhasil di-generate');
+    setLaporanDialogOpen(false);
+  };
+
   const createProgram = async () => {
     if (!newProgram.name.trim()) { toast.error('Nama program wajib diisi'); return; }
     let fileUrl: string | null = null;
