@@ -59,7 +59,6 @@ export default function PegawaiDashboard() {
     tempat: '',
     judul_materi: '',
     isi_materi: '',
-    saran: '',
     kepala_nama: '',
     status_klien: 'CUTI BERSYARAT',
     nomor_surat: '',
@@ -243,7 +242,6 @@ export default function PegawaiDashboard() {
       tempat: (client as any).profile?.address || '',
       judul_materi: '',
       isi_materi: '',
-      saran: '',
       kepala_nama: '',
       status_klien: 'CUTI BERSYARAT',
       nomor_surat: '',
@@ -256,11 +254,11 @@ export default function PegawaiDashboard() {
     const profile = (laporanClient as any).profile;
     const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
     const pw = doc.internal.pageSize.getWidth();
-    const margin = 20;
-    let y = 15;
+    const margin = 25;
+    let y = 18;
 
-    // Header
-    doc.setFontSize(9);
+    // Header - KOP SURAT
+    doc.setFontSize(10);
     doc.setFont('helvetica', 'bold');
     doc.text('KEMENTERIAN IMIGRASI DAN PEMASYARAKATAN REPUBLIK INDONESIA', pw / 2, y, { align: 'center' });
     y += 5;
@@ -268,22 +266,26 @@ export default function PegawaiDashboard() {
     y += 5;
     doc.text('KANTOR WILAYAH JAWA TIMUR', pw / 2, y, { align: 'center' });
     y += 5;
+    doc.setFontSize(11);
     doc.text('BALAI PEMASYARAKATAN KELAS I MALANG', pw / 2, y, { align: 'center' });
     y += 5;
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7);
     doc.text('Jalan Barito No. 1, Bunulrejo, Blimbing, Malang', pw / 2, y, { align: 'center' });
+    y += 3;
+    doc.setFont('helvetica', 'italic');
+    doc.text('Laman: , Pos-el: ', pw / 2, y, { align: 'center' });
     y += 4;
 
-    // Line
-    doc.setLineWidth(0.8);
+    // Double line
+    doc.setLineWidth(1);
     doc.line(margin, y, pw - margin, y);
-    y += 2;
+    y += 1.5;
     doc.setLineWidth(0.3);
     doc.line(margin, y, pw - margin, y);
-    y += 8;
+    y += 10;
 
-    // Title
+    // Title block
     doc.setFontSize(11);
     doc.setFont('helvetica', 'bold');
     doc.text('LAPORAN HASIL BIMBINGAN DAN PENGAWASAN KLIEN', pw / 2, y, { align: 'center' });
@@ -296,13 +298,13 @@ export default function PegawaiDashboard() {
     if (laporanForm.nomor_surat) {
       doc.text(`Nomor: ${laporanForm.nomor_surat}`, pw / 2, y, { align: 'center' });
     }
-    y += 8;
+    y += 10;
 
     // I. IDENTITAS
     doc.setFontSize(10);
     doc.setFont('helvetica', 'bold');
     doc.text('I. IDENTITAS', margin, y);
-    y += 6;
+    y += 7;
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(9);
@@ -313,73 +315,96 @@ export default function PegawaiDashboard() {
       ? `${format(new Date(laporanForm.tanggal_pelaksanaan), 'dd MMMM yyyy')} / Pukul ${laporanForm.jam_mulai}-${laporanForm.jam_selesai} WIB`
       : '-';
 
-    const identityItems = [
-      ['Nama Klien', (profile?.full_name || '-').toUpperCase()],
-      ['Nomor Register Bapas', laporanClient.case_number || '-'],
-      ['Masa Bimbingan', masaBimbingan],
-      ['Jenis Kelamin', profile?.gender === 'L' ? 'Laki-laki' : profile?.gender === 'P' ? 'Perempuan' : profile?.gender || '-'],
-      ['Agama', laporanForm.agama],
-      ['Jenis Bimbingan', laporanForm.jenis_bimbingan],
-      ['Bimbingan ke', laporanForm.bimbingan_ke],
-      ['Pembimbing Kemasyarakatan', '-'],
-      ['Tanggal / Jam Pelaksanaan', tanggalJam],
-      ['Tempat dilaksanakan', laporanForm.tempat],
+    const { data: pkProfile } = await supabase.from('profiles').select('full_name').eq('user_id', user!.id).maybeSingle();
+
+    const identityItems: [string, string, boolean][] = [
+      ['Nama Klien', (profile?.full_name || '-').toUpperCase(), true],
+      ['Nomor Register Bapas', laporanClient.case_number || '-', false],
+      ['Masa Bimbingan', masaBimbingan, false],
+      ['Jenis Kelamin', profile?.gender === 'L' ? 'Laki-laki' : profile?.gender === 'P' ? 'Perempuan' : profile?.gender || '-', false],
+      ['Agama', laporanForm.agama, false],
+      ['Jenis Bimbingan', laporanForm.jenis_bimbingan, false],
+      ['Bimbingan ke', `${laporanForm.bimbingan_ke} (${numberToWord(parseInt(laporanForm.bimbingan_ke) || 1)})`, false],
+      ['Pembimbing Kemasyarakatan', (pkProfile?.full_name || '-').toUpperCase(), true],
+      ['Tanggal / Jam Pelaksanaan', tanggalJam, false],
+      ['Tempat dilaksanakan', laporanForm.tempat, false],
     ];
 
-    // Get PK name
-    const { data: pkProfile } = await supabase.from('profiles').select('full_name').eq('user_id', user!.id).maybeSingle();
-    identityItems[7][1] = (pkProfile?.full_name || '-').toUpperCase();
-
-    const labelX = margin + 3;
+    const labelX = margin + 5;
     const colonX = margin + 62;
     const valueX = margin + 65;
+    const maxValueW = pw - margin - valueX;
 
-    identityItems.forEach(([label, value], i) => {
-      doc.text(`${i + 1}.`, margin, y);
+    identityItems.forEach(([label, value, isBold], i) => {
+      const num = i < 9 ? `${i + 1}.` : `${i + 1}.`;
+      doc.setFont('helvetica', 'normal');
+      doc.text(num, margin, y);
       doc.text(label, labelX, y);
       doc.text(':', colonX, y);
-      const lines = doc.splitTextToSize(value, pw - margin - valueX);
+      doc.setFont('helvetica', isBold ? 'bold' : 'normal');
+      const lines = doc.splitTextToSize(value, maxValueW);
       doc.text(lines, valueX, y);
-      y += lines.length * 4.5;
+      y += lines.length * 5;
     });
-    y += 4;
+    y += 6;
 
     // II. MATERI BIMBINGAN
     doc.setFontSize(10);
     doc.setFont('helvetica', 'bold');
     doc.text('II. MATERI BIMBINGAN', margin, y);
-    y += 6;
+    y += 7;
 
     doc.setFontSize(9);
-    doc.text('Bimbingan Kepribadian', margin + 3, y);
+    doc.setFont('helvetica', 'normal');
+    const jenisBimbLabel = laporanForm.jenis_bimbingan.includes('Kemandirian') ? 'Bimbingan Kemandirian' : 'Bimbingan Kepribadian';
+    doc.text(jenisBimbLabel, margin + 5, y);
     y += 5;
-    doc.text(`Judul Materi : ${laporanForm.judul_materi}`, margin + 3, y);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`Judul Materi : ${laporanForm.judul_materi}`, margin + 5, y);
     y += 5;
     doc.setFont('helvetica', 'italic');
-    doc.text('Isi Materi:', margin + 3, y);
+    doc.text('Isi Materi:', margin + 5, y);
     y += 5;
     doc.setFont('helvetica', 'normal');
-    const materiLines = doc.splitTextToSize(laporanForm.isi_materi || '-', pw - margin * 2 - 6);
-    materiLines.forEach((line: string) => {
-      if (y > 270) { doc.addPage(); y = 20; }
-      doc.text(line, margin + 5, y);
-      y += 4.5;
-    });
-    y += 4;
 
-    // III. SARAN
-    if (y > 250) { doc.addPage(); y = 20; }
+    // Split isi_materi by newlines for bullet support
+    const materiParagraphs = (laporanForm.isi_materi || '-').split('\n');
+    materiParagraphs.forEach((para: string) => {
+      const trimmed = para.trim();
+      if (!trimmed) { y += 3; return; }
+      const prefix = trimmed.startsWith('•') || trimmed.startsWith('-') ? '' : '• ';
+      const text = prefix ? `${prefix}${trimmed}` : trimmed;
+      const lines = doc.splitTextToSize(text, pw - margin * 2 - 12);
+      lines.forEach((line: string) => {
+        if (y > 270) { doc.addPage(); y = 20; }
+        doc.text(line, margin + 7, y);
+        y += 4.5;
+      });
+    });
+    y += 6;
+
+    // III. SARAN (template-based, not manual)
+    if (y > 240) { doc.addPage(); y = 20; }
     doc.setFontSize(10);
     doc.setFont('helvetica', 'bold');
     doc.text('III. SARAN', margin, y);
-    y += 6;
+    y += 7;
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(9);
-    const saranLines = doc.splitTextToSize(laporanForm.saran || '-', pw - margin * 2 - 6);
-    saranLines.forEach((line: string, i: number) => {
+
+    const saranItems = [
+      'Mengingatkan klien untuk mentaati norma-norma hukum dan agama;',
+      'Menyarankan klien untuk meningkatkan ketaqwaan kepada Tuhan Yang Maha Esa;',
+      'Mengingatkan klien untuk tidak lupa melaksanakan wajib lapor setiap bulannya;',
+      'Memberikan semangat kepada klien dalam melaksanakan pekerjaannya sehari-hari.',
+    ];
+
+    saranItems.forEach((saran, i) => {
       if (y > 270) { doc.addPage(); y = 20; }
-      doc.text(line, margin + 5, y);
-      y += 4.5;
+      doc.text(`${i + 1}.`, margin + 5, y);
+      const lines = doc.splitTextToSize(saran, pw - margin * 2 - 15);
+      doc.text(lines, margin + 12, y);
+      y += lines.length * 4.5 + 1;
     });
     y += 10;
 
@@ -389,22 +414,28 @@ export default function PegawaiDashboard() {
       ? format(new Date(laporanForm.tanggal_pelaksanaan), 'dd MMMM yyyy')
       : format(new Date(), 'dd MMMM yyyy');
 
-    // Left: Kepala
+    const sigRightX = pw - margin - 65;
     doc.setFontSize(9);
     doc.text('Mengetahui :', margin, y);
-    doc.text(`Malang, ${tglLaporan}`, pw - margin - 60, y);
+    doc.text(`Malang, ${tglLaporan}`, sigRightX, y);
     y += 5;
     doc.text('Kepala,', margin, y);
-    doc.text('Pembimbing Kemasyarakatan,', pw - margin - 60, y);
-    y += 25;
+    doc.text('Pembimbing Kemasyarakatan Muda,', sigRightX, y);
+    y += 28;
     doc.setFont('helvetica', 'bold');
     doc.text(laporanForm.kepala_nama || '............................', margin, y);
-    doc.text(pkProfile?.full_name || '-', pw - margin - 60, y);
+    doc.text(pkProfile?.full_name || '-', sigRightX, y);
 
     const clientName = (profile?.full_name || 'klien').replace(/\s+/g, '_');
     doc.save(`Laporan_Bimbingan_${clientName}_${format(new Date(), 'yyyy-MM-dd')}.pdf`);
     toast.success('PDF Laporan Bimbingan berhasil di-generate');
     setLaporanDialogOpen(false);
+  };
+
+  const numberToWord = (n: number): string => {
+    const words = ['', 'Satu', 'Dua', 'Tiga', 'Empat', 'Lima', 'Enam', 'Tujuh', 'Delapan', 'Sembilan', 'Sepuluh',
+      'Sebelas', 'Dua Belas', 'Tiga Belas', 'Empat Belas', 'Lima Belas'];
+    return words[n] || String(n);
   };
 
   const createProgram = async () => {
@@ -957,7 +988,13 @@ export default function PegawaiDashboard() {
               </div>
               <div className="space-y-1">
                 <Label className="text-xs">Jenis Bimbingan</Label>
-                <Input value={laporanForm.jenis_bimbingan} onChange={e => setLaporanForm(f => ({ ...f, jenis_bimbingan: e.target.value }))} />
+                <Select value={laporanForm.jenis_bimbingan} onValueChange={v => setLaporanForm(f => ({ ...f, jenis_bimbingan: v }))}>
+                  <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Kepribadian dan Pengawasan">Kepribadian dan Pengawasan</SelectItem>
+                    <SelectItem value="Kemandirian dan Pengawasan">Kemandirian dan Pengawasan</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <div className="grid grid-cols-3 gap-3">
                 <div className="space-y-1">
@@ -984,10 +1021,6 @@ export default function PegawaiDashboard() {
               <div className="space-y-1">
                 <Label className="text-xs">Isi Materi</Label>
                 <Textarea value={laporanForm.isi_materi} onChange={e => setLaporanForm(f => ({ ...f, isi_materi: e.target.value }))} rows={5} placeholder="Tuliskan isi materi bimbingan..." />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs">Saran</Label>
-                <Textarea value={laporanForm.saran} onChange={e => setLaporanForm(f => ({ ...f, saran: e.target.value }))} rows={3} placeholder="Tuliskan saran..." />
               </div>
               <div className="space-y-1">
                 <Label className="text-xs">Nama Kepala Bapas</Label>
