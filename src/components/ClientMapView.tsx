@@ -59,7 +59,6 @@ export default function ClientMapView() {
         setMyClientIds(currentIds => {
           if (!currentIds.has(newLoc.user_id)) return currentIds;
           
-          // Fetch profile name for this client
           supabase
             .from('profiles')
             .select('full_name')
@@ -83,7 +82,20 @@ export default function ClientMapView() {
       })
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
+    // Also poll every 30 seconds as fallback
+    const pollInterval = setInterval(async () => {
+      setMyClientIds(currentIds => {
+        if (currentIds.size > 0) {
+          loadLocations(currentIds);
+        }
+        return currentIds;
+      });
+    }, 30000);
+
+    return () => {
+      supabase.removeChannel(channel);
+      clearInterval(pollInterval);
+    };
   }, [user]);
 
   const loadLocations = async (clientUserIds: Set<string>) => {
