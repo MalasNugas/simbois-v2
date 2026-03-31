@@ -54,18 +54,39 @@ export default function ClientMapView() {
         if (!latestByUser.has(d.user_id)) latestByUser.set(d.user_id, d);
       });
 
-      // Fetch profile names
       const userIds = Array.from(latestByUser.keys());
+
+      // Filter out non-klien users (admin, pegawai)
+      const { data: roles } = await supabase
+        .from('user_roles')
+        .select('user_id, role')
+        .in('user_id', userIds);
+
+      const klienUserIds = new Set(
+        (roles || [])
+          .filter(r => r.role === 'klien')
+          .map(r => r.user_id)
+      );
+
+      // Remove users who are admin or pegawai
+      const filteredUserIds = userIds.filter(uid => klienUserIds.has(uid));
+
+      // Fetch profile names
       const { data: profiles } = await supabase
         .from('profiles')
         .select('user_id, full_name')
-        .in('user_id', userIds);
+        .in('user_id', filteredUserIds);
 
       const nameMap = new Map(profiles?.map(p => [p.user_id, p.full_name]) || []);
-      const locationsWithNames = Array.from(latestByUser.values()).map(loc => ({
-        ...loc,
-        profile_name: nameMap.get(loc.user_id) || loc.user_id.slice(0, 8) + '...',
-      }));
+      const locationsWithNames = filteredUserIds
+        .filter(uid => latestByUser.has(uid))
+        .map(uid => {
+          const loc = latestByUser.get(uid)!;
+          return {
+            ...loc,
+            profile_name: nameMap.get(loc.user_id) || loc.user_id.slice(0, 8) + '...',
+          };
+        });
 
       setLocations(locationsWithNames);
     }
