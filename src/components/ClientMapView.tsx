@@ -136,7 +136,7 @@ export default function ClientMapView() {
         .in('user_id', filteredUserIds);
 
       const nameMap = new Map(profiles?.map(p => [p.user_id, p.full_name]) || []);
-      const locationsWithNames = trackedUserIds.map(uid => {
+      const locationsWithNames = filteredUserIds.map(uid => {
         const loc = latestByUser.get(uid)!;
         return {
           ...loc,
