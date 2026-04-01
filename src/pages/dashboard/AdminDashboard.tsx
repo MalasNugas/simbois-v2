@@ -405,6 +405,11 @@ export default function AdminDashboard() {
                                         ) : (
                                           <span className="text-muted-foreground text-xs">-</span>
                                         )}
+                                       </TableCell>
+                                      <TableCell>
+                                        <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); openGuidanceDialog(c); }} title="Atur Masa Bimbingan">
+                                          <CalendarDays className="w-3 h-3 mr-1" /> Masa
+                                        </Button>
                                       </TableCell>
                                     </TableRow>
                                   ))}
