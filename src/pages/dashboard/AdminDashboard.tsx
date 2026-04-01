@@ -119,7 +119,28 @@ export default function AdminDashboard() {
     }
   };
 
-  const totalPegawai = pegawaiList.length;
+  const openGuidanceDialog = (client: ClientDetail) => {
+    setGuidanceClient(client);
+    setGuidanceForm({
+      guidance_start: client.guidance_start || '',
+      guidance_end: client.guidance_end || '',
+    });
+    setGuidanceDialogOpen(true);
+  };
+
+  const saveGuidancePeriod = async () => {
+    if (!guidanceClient) return;
+    const { error } = await supabase.from('clients').update({
+      guidance_start: guidanceForm.guidance_start || null,
+      guidance_end: guidanceForm.guidance_end || null,
+    } as any).eq('user_id', guidanceClient.user_id);
+    if (error) { toast.error(error.message); return; }
+    toast.success('Masa bimbingan berhasil diperbarui');
+    setGuidanceDialogOpen(false);
+    loadData();
+  };
+
+
   const totalNeedsTermination = pegawaiList.reduce((sum, p) => sum + p.needsTermination, 0);
   const totalAllClients = pegawaiList.reduce((sum, p) => sum + p.totalClients, 0);
   const totalTerminated = pegawaiList.reduce((sum, p) => sum + p.hasTerminationReport, 0);
