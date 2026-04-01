@@ -840,9 +840,6 @@ export default function PegawaiDashboard() {
                             <Button size="sm" variant="outline" onClick={() => openLaporanDialog(c)} title="Generate Laporan Bimbingan">
                               <FileText className="w-3 h-3 mr-1" /> Laporan
                             </Button>
-                            <Button size="sm" variant="outline" onClick={() => openGuidanceDialog(c)} title="Atur Masa Bimbingan">
-                              <CalendarDays className="w-3 h-3 mr-1" /> Masa
-                            </Button>
                             {!(c as any).profile?.is_verified && (
                               <Button size="sm" variant="outline" onClick={() => verifyClient(c.user_id)}>Verifikasi</Button>
                             )}
