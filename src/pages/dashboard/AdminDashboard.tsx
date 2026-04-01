@@ -140,7 +140,7 @@ export default function AdminDashboard() {
     loadData();
   };
 
-
+  const totalPegawai = pegawaiList.length;
   const totalNeedsTermination = pegawaiList.reduce((sum, p) => sum + p.needsTermination, 0);
   const totalAllClients = pegawaiList.reduce((sum, p) => sum + p.totalClients, 0);
   const totalTerminated = pegawaiList.reduce((sum, p) => sum + p.hasTerminationReport, 0);
