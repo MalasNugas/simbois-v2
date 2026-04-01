@@ -45,6 +45,9 @@ export default function AdminDashboard() {
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedPegawai, setExpandedPegawai] = useState<string | null>(null);
   const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'done'>('all');
+  const [guidanceDialogOpen, setGuidanceDialogOpen] = useState(false);
+  const [guidanceClient, setGuidanceClient] = useState<ClientDetail | null>(null);
+  const [guidanceForm, setGuidanceForm] = useState({ guidance_start: '', guidance_end: '' });
 
   useEffect(() => {
     if (!authLoading && role !== 'admin') {
