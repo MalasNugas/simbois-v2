@@ -117,11 +117,23 @@ export default function ClientMapView() {
 
       const trackedUserIds = Array.from(latestByUser.keys());
 
+      // Filter to only show users with 'klien' role
+      const { data: roles } = await supabase
+        .from('user_roles')
+        .select('user_id, role')
+        .in('user_id', trackedUserIds);
+
+      const klienOnlyIds = (roles || [])
+        .filter(r => r.role === 'klien')
+        .map(r => r.user_id);
+
+      const filteredUserIds = trackedUserIds.filter(uid => klienOnlyIds.includes(uid));
+
       // Fetch profile names
       const { data: profiles } = await supabase
         .from('profiles')
         .select('user_id, full_name')
-        .in('user_id', trackedUserIds);
+        .in('user_id', filteredUserIds);
 
       const nameMap = new Map(profiles?.map(p => [p.user_id, p.full_name]) || []);
       const locationsWithNames = trackedUserIds.map(uid => {
