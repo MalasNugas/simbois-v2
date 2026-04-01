@@ -348,9 +348,10 @@ export default function AdminDashboard() {
                                     <TableHead>No. Litmas</TableHead>
                                     <TableHead>Status Klien</TableHead>
                                     <TableHead>Status Bimbingan</TableHead>
-                                    <TableHead>Masa Bimbingan</TableHead>
-                                    <TableHead>Laporan Pengakhiran</TableHead>
-                                    <TableHead>Keterangan</TableHead>
+                                     <TableHead>Masa Bimbingan</TableHead>
+                                     <TableHead>Laporan Pengakhiran</TableHead>
+                                     <TableHead>Keterangan</TableHead>
+                                     <TableHead>Aksi</TableHead>
                                   </TableRow>
                                 </TableHeader>
                                 <TableBody>
