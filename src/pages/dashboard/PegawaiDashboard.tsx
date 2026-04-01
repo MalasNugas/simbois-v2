@@ -840,9 +840,6 @@ export default function PegawaiDashboard() {
                             <Button size="sm" variant="outline" onClick={() => openLaporanDialog(c)} title="Generate Laporan Bimbingan">
                               <FileText className="w-3 h-3 mr-1" /> Laporan
                             </Button>
-                            <Button size="sm" variant="outline" onClick={() => openGuidanceDialog(c)} title="Atur Masa Bimbingan">
-                              <CalendarDays className="w-3 h-3 mr-1" /> Masa
-                            </Button>
                             {!(c as any).profile?.is_verified && (
                               <Button size="sm" variant="outline" onClick={() => verifyClient(c.user_id)}>Verifikasi</Button>
                             )}
@@ -909,26 +906,6 @@ export default function PegawaiDashboard() {
           </DialogContent>
         </Dialog>
 
-        {/* Guidance Period Dialog */}
-        <Dialog open={guidanceDialogOpen} onOpenChange={setGuidanceDialogOpen}>
-          <DialogContent className="bg-card border-border">
-            <DialogHeader><DialogTitle>Atur Masa Bimbingan</DialogTitle></DialogHeader>
-            <p className="text-sm text-muted-foreground mb-2">
-              Klien: <strong>{(guidanceClient as any)?.profile?.full_name}</strong>
-            </p>
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label>Tanggal Mulai Bimbingan</Label>
-                <Input type="date" value={guidanceForm.guidance_start} onChange={e => setGuidanceForm(f => ({ ...f, guidance_start: e.target.value }))} />
-              </div>
-              <div className="space-y-2">
-                <Label>Tanggal Berakhir Bimbingan</Label>
-                <Input type="date" value={guidanceForm.guidance_end} onChange={e => setGuidanceForm(f => ({ ...f, guidance_end: e.target.value }))} />
-              </div>
-              <Button onClick={saveGuidancePeriod} className="w-full">Simpan</Button>
-            </div>
-          </DialogContent>
-        </Dialog>
 
         {/* Termination Report Dialog */}
         <Dialog open={terminationDialogOpen} onOpenChange={setTerminationDialogOpen}>

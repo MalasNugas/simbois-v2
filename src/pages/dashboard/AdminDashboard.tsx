@@ -2,10 +2,13 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '@/lib/auth';
 import { supabase } from '@/integrations/supabase/client';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Users, Search, AlertTriangle, CheckCircle2, Clock, ShieldCheck } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Users, Search, AlertTriangle, CheckCircle2, Clock, ShieldCheck, CalendarDays } from 'lucide-react';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 
@@ -42,6 +45,9 @@ export default function AdminDashboard() {
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedPegawai, setExpandedPegawai] = useState<string | null>(null);
   const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'done'>('all');
+  const [guidanceDialogOpen, setGuidanceDialogOpen] = useState(false);
+  const [guidanceClient, setGuidanceClient] = useState<ClientDetail | null>(null);
+  const [guidanceForm, setGuidanceForm] = useState({ guidance_start: '', guidance_end: '' });
 
   useEffect(() => {
     if (!authLoading && role !== 'admin') {
@@ -111,6 +117,27 @@ export default function AdminDashboard() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const openGuidanceDialog = (client: ClientDetail) => {
+    setGuidanceClient(client);
+    setGuidanceForm({
+      guidance_start: client.guidance_start || '',
+      guidance_end: client.guidance_end || '',
+    });
+    setGuidanceDialogOpen(true);
+  };
+
+  const saveGuidancePeriod = async () => {
+    if (!guidanceClient) return;
+    const { error } = await supabase.from('clients').update({
+      guidance_start: guidanceForm.guidance_start || null,
+      guidance_end: guidanceForm.guidance_end || null,
+    } as any).eq('user_id', guidanceClient.user_id);
+    if (error) { toast.error(error.message); return; }
+    toast.success('Masa bimbingan berhasil diperbarui');
+    setGuidanceDialogOpen(false);
+    loadData();
   };
 
   const totalPegawai = pegawaiList.length;
@@ -321,9 +348,10 @@ export default function AdminDashboard() {
                                     <TableHead>No. Litmas</TableHead>
                                     <TableHead>Status Klien</TableHead>
                                     <TableHead>Status Bimbingan</TableHead>
-                                    <TableHead>Masa Bimbingan</TableHead>
-                                    <TableHead>Laporan Pengakhiran</TableHead>
-                                    <TableHead>Keterangan</TableHead>
+                                     <TableHead>Masa Bimbingan</TableHead>
+                                     <TableHead>Laporan Pengakhiran</TableHead>
+                                     <TableHead>Keterangan</TableHead>
+                                     <TableHead>Aksi</TableHead>
                                   </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -377,6 +405,11 @@ export default function AdminDashboard() {
                                         ) : (
                                           <span className="text-muted-foreground text-xs">-</span>
                                         )}
+                                       </TableCell>
+                                      <TableCell>
+                                        <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); openGuidanceDialog(c); }} title="Atur Masa Bimbingan">
+                                          <CalendarDays className="w-3 h-3 mr-1" /> Masa
+                                        </Button>
                                       </TableCell>
                                     </TableRow>
                                   ))}
@@ -393,6 +426,27 @@ export default function AdminDashboard() {
             )}
           </CardContent>
         </Card>
+
+        {/* Guidance Period Dialog */}
+        <Dialog open={guidanceDialogOpen} onOpenChange={setGuidanceDialogOpen}>
+          <DialogContent className="bg-card border-border">
+            <DialogHeader><DialogTitle>Atur Masa Bimbingan</DialogTitle></DialogHeader>
+            <p className="text-sm text-muted-foreground mb-2">
+              Klien: <strong>{guidanceClient?.full_name}</strong>
+            </p>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Tanggal Mulai Bimbingan</Label>
+                <Input type="date" value={guidanceForm.guidance_start} onChange={e => setGuidanceForm(f => ({ ...f, guidance_start: e.target.value }))} />
+              </div>
+              <div className="space-y-2">
+                <Label>Tanggal Berakhir Bimbingan</Label>
+                <Input type="date" value={guidanceForm.guidance_end} onChange={e => setGuidanceForm(f => ({ ...f, guidance_end: e.target.value }))} />
+              </div>
+              <Button onClick={saveGuidancePeriod} className="w-full">Simpan</Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );
