@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
-import { Users, BookOpen, Briefcase, MapPin, Plus, CheckCircle, XCircle, Filter, Search, Pencil, Trash2, FileText, Bell, CalendarDays, Download } from 'lucide-react';
+import { Users, BookOpen, Briefcase, MapPin, Plus, CheckCircle, XCircle, Filter, Search, Pencil, Trash2, FileText, Bell, Download, Upload } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { format } from 'date-fns';
@@ -17,7 +17,6 @@ import { Switch } from '@/components/ui/switch';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import ClientMapView from '@/components/ClientMapView';
 import StatistikDashboard from '@/components/StatistikDashboard';
-import PegawaiChatList from '@/components/PegawaiChatList';
 
 export default function PegawaiDashboard() {
   const { user } = useAuth();
@@ -39,14 +38,12 @@ export default function PegawaiDashboard() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [programToDelete, setProgramToDelete] = useState<any>(null);
   const [uploadingPdf, setUploadingPdf] = useState(false);
-  const [guidanceDialogOpen, setGuidanceDialogOpen] = useState(false);
-  const [guidanceClient, setGuidanceClient] = useState<any>(null);
-  const [guidanceForm, setGuidanceForm] = useState({ guidance_start: '', guidance_end: '' });
-  const [monthlyReports, setMonthlyReports] = useState<any[]>([]);
   const [terminationReports, setTerminationReports] = useState<any[]>([]);
   const [terminationDialogOpen, setTerminationDialogOpen] = useState(false);
   const [terminationClient, setTerminationClient] = useState<any>(null);
   const [terminationNotes, setTerminationNotes] = useState('');
+  const [terminationFile, setTerminationFile] = useState<File | null>(null);
+  const [uploadingTermination, setUploadingTermination] = useState(false);
   const [laporanDialogOpen, setLaporanDialogOpen] = useState(false);
   const [laporanClient, setLaporanClient] = useState<any>(null);
   const [laporanForm, setLaporanForm] = useState({
@@ -65,15 +62,15 @@ export default function PegawaiDashboard() {
   });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const editFileInputRef = useRef<HTMLInputElement>(null);
+  const terminationFileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { loadData(); }, []);
 
   const loadData = async () => {
-    const [clientsRes, programsRes, regsRes, reportsRes, termRes] = await Promise.all([
+    const [clientsRes, programsRes, regsRes, termRes] = await Promise.all([
       supabase.from('clients').select('*').order('created_at', { ascending: false }),
       supabase.from('programs').select('*').order('created_at', { ascending: false }),
       supabase.from('program_registrations').select('*, programs(*)'),
-      supabase.from('monthly_reports' as any).select('*'),
       supabase.from('termination_reports' as any).select('*'),
     ]);
 
@@ -96,7 +93,6 @@ export default function PegawaiDashboard() {
     setClients(clientsData);
     setPrograms(programsRes.data || []);
     setRegistrations(regsData);
-    setMonthlyReports((reportsRes.data as any[]) || []);
     setTerminationReports((termRes.data as any[]) || []);
   };
 
@@ -126,19 +122,9 @@ export default function PegawaiDashboard() {
       return name.includes(q) || caseNum.includes(q);
     });
 
-  // Clients with ended guidance
   const clientsWithEndedGuidance = displayedClients.filter(c => {
     if (!c.guidance_end || c.guidance_status !== 'aktif') return false;
     return new Date(c.guidance_end) <= new Date();
-  });
-
-  // Current month report check
-  const now = new Date();
-  const currentMonth = now.getMonth() + 1;
-  const currentYear = now.getFullYear();
-  const clientsNotReported = displayedClients.filter(c => {
-    if (c.guidance_status !== 'aktif') return false;
-    return !monthlyReports.some(r => r.client_id === c.user_id && r.report_month === currentMonth && r.report_year === currentYear);
   });
 
   const clientStatusLabel: Record<string, string> = {
@@ -184,27 +170,6 @@ export default function PegawaiDashboard() {
     else { toast.success('Status klien diperbarui'); loadData(); }
   };
 
-  const openGuidanceDialog = (client: any) => {
-    setGuidanceClient(client);
-    setGuidanceForm({
-      guidance_start: client.guidance_start || '',
-      guidance_end: client.guidance_end || '',
-    });
-    setGuidanceDialogOpen(true);
-  };
-
-  const saveGuidancePeriod = async () => {
-    if (!guidanceClient) return;
-    const { error } = await supabase.from('clients').update({
-      guidance_start: guidanceForm.guidance_start || null,
-      guidance_end: guidanceForm.guidance_end || null,
-    } as any).eq('user_id', guidanceClient.user_id);
-    if (error) { toast.error(error.message); return; }
-    toast.success('Masa bimbingan berhasil diperbarui');
-    setGuidanceDialogOpen(false);
-    loadData();
-  };
-
   const endGuidance = async (userId: string) => {
     const { error } = await supabase.from('clients').update({ guidance_status: 'selesai' as any }).eq('user_id', userId);
     if (error) toast.error(error.message);
@@ -214,16 +179,45 @@ export default function PegawaiDashboard() {
   const openTerminationDialog = (client: any) => {
     setTerminationClient(client);
     setTerminationNotes('');
+    setTerminationFile(null);
+    if (terminationFileRef.current) terminationFileRef.current.value = '';
     setTerminationDialogOpen(true);
   };
 
   const submitTerminationReport = async () => {
     if (!terminationClient) return;
+    setUploadingTermination(true);
+
+    let fileUrl: string | null = null;
+    if (terminationFile) {
+      if (terminationFile.type !== 'application/pdf') {
+        toast.error('Hanya file PDF yang diizinkan');
+        setUploadingTermination(false);
+        return;
+      }
+      if (terminationFile.size > 10 * 1024 * 1024) {
+        toast.error('Ukuran file maksimal 10MB');
+        setUploadingTermination(false);
+        return;
+      }
+      const fileName = `${Date.now()}-${terminationFile.name}`;
+      const { error: uploadError } = await supabase.storage.from('termination-files').upload(fileName, terminationFile);
+      if (uploadError) {
+        toast.error('Gagal upload file: ' + uploadError.message);
+        setUploadingTermination(false);
+        return;
+      }
+      const { data: urlData } = supabase.storage.from('termination-files').getPublicUrl(fileName);
+      fileUrl = urlData.publicUrl;
+    }
+
     const { error } = await supabase.from('termination_reports' as any).insert({
       client_id: terminationClient.user_id,
       pegawai_id: user!.id,
       notes: terminationNotes || null,
+      file_url: fileUrl,
     });
+    setUploadingTermination(false);
     if (error) { toast.error(error.message); return; }
     toast.success('Laporan pengakhiran berhasil dibuat');
     setTerminationDialogOpen(false);
@@ -257,7 +251,6 @@ export default function PegawaiDashboard() {
     const margin = 25;
     let y = 18;
 
-    // Header - KOP SURAT
     doc.setFontSize(9);
     doc.setFont('helvetica', 'bold');
     doc.text('KEMENTERIAN IMIGRASI DAN PEMASYARAKATAN REPUBLIK INDONESIA', pw / 2, y, { align: 'center' });
@@ -276,7 +269,6 @@ export default function PegawaiDashboard() {
     doc.text('Laman: https://bapasmalang.kemenkumham.go.id, Pos-el : bapasmalang@gmail.com', pw / 2, y, { align: 'center' });
     y += 3;
 
-    // Double line
     doc.setLineWidth(0.8);
     doc.line(margin, y, pw - margin, y);
     y += 1.2;
@@ -284,7 +276,6 @@ export default function PegawaiDashboard() {
     doc.line(margin, y, pw - margin, y);
     y += 10;
 
-    // Title block
     doc.setFontSize(10);
     doc.setFont('helvetica', 'bold');
     doc.text('LAPORAN HASIL BIMBINGAN  DAN  PENGAWASAN KLIEN', pw / 2, y, { align: 'center' });
@@ -294,7 +285,6 @@ export default function PegawaiDashboard() {
     doc.text(`Nomor : ${laporanForm.nomor_surat || 'WP.15.PAS.15.PK.06.03 - ........'}`, pw / 2, y, { align: 'center' });
     y += 10;
 
-    // I. IDENTITAS
     doc.setFontSize(10);
     doc.setFont('helvetica', 'bold');
     doc.text('I.', margin, y);
@@ -343,7 +333,6 @@ export default function PegawaiDashboard() {
     });
     y += 8;
 
-    // II. MATERI BIMBINGAN
     doc.setFontSize(10);
     doc.setFont('helvetica', 'bold');
     doc.text('II.', margin, y);
@@ -360,7 +349,6 @@ export default function PegawaiDashboard() {
     doc.text('Isi Materi :', margin + 12, y);
     y += 5;
 
-    // Split isi_materi by newlines for dash bullet support
     const materiParagraphs = (laporanForm.isi_materi || '-').split('\n');
     materiParagraphs.forEach((para: string) => {
       const trimmed = para.trim();
@@ -379,7 +367,6 @@ export default function PegawaiDashboard() {
     });
     y += 6;
 
-    // III. SARAN (template-based)
     if (y > 240) { doc.addPage(); y = 20; }
     doc.setFontSize(10);
     doc.setFont('helvetica', 'bold');
@@ -405,7 +392,6 @@ export default function PegawaiDashboard() {
     });
     y += 12;
 
-    // Signatures
     if (y > 230) { doc.addPage(); y = 20; }
     const tglLaporan = laporanForm.tanggal_pelaksanaan
       ? format(new Date(laporanForm.tanggal_pelaksanaan), 'd MMMM yyyy')
@@ -602,17 +588,6 @@ export default function PegawaiDashboard() {
           </Alert>
         )}
 
-        {clientsNotReported.length > 0 && (
-          <Alert className="border-yellow-500/50 bg-yellow-500/10">
-            <Bell className="h-4 w-4 text-yellow-500" />
-            <AlertTitle className="text-yellow-500">Klien Belum Wajib Lapor</AlertTitle>
-            <AlertDescription>
-              {clientsNotReported.length} klien belum melakukan wajib lapor bulan ini:
-              {' '}{clientsNotReported.map(c => (c as any).profile?.full_name).filter(Boolean).join(', ')}
-            </AlertDescription>
-          </Alert>
-        )}
-
         {/* Filter & Search */}
         <div className="glass-card rounded-xl p-4 space-y-4">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -787,7 +762,6 @@ export default function PegawaiDashboard() {
                     <th className="pb-3 text-muted-foreground font-medium">No. Litmas</th>
                     <th className="pb-3 text-muted-foreground font-medium">Bimbingan</th>
                     <th className="pb-3 text-muted-foreground font-medium">Masa Bimbingan</th>
-                    <th className="pb-3 text-muted-foreground font-medium">Wajib Lapor</th>
                     <th className="pb-3 text-muted-foreground font-medium">Status Klien</th>
                     <th className="pb-3 text-muted-foreground font-medium">Verifikasi</th>
                     <th className="pb-3 text-muted-foreground font-medium">Aksi</th>
@@ -795,9 +769,7 @@ export default function PegawaiDashboard() {
                 </thead>
                 <tbody>
                   {displayedClients.map(c => {
-                    const reportedThisMonth = monthlyReports.some(
-                      r => r.client_id === c.user_id && r.report_month === currentMonth && r.report_year === currentYear
-                    );
+                    const termReport = terminationReports.find(t => t.client_id === c.user_id);
                     return (
                       <tr key={c.id} className="border-b border-border/50">
                         <td className="py-3">
@@ -815,13 +787,6 @@ export default function PegawaiDashboard() {
                             </span>
                           ) : (
                             <span className="text-xs text-muted-foreground">Belum diatur</span>
-                          )}
-                        </td>
-                        <td className="py-3">
-                          {reportedThisMonth ? (
-                            <Badge variant="default">✓ Sudah</Badge>
-                          ) : (
-                            <Badge variant="secondary">✗ Belum</Badge>
                           )}
                         </td>
                         <td className="py-3">
@@ -846,15 +811,22 @@ export default function PegawaiDashboard() {
                             {c.guidance_end && new Date(c.guidance_end) <= new Date() && c.guidance_status === 'aktif' && (
                               <Button size="sm" variant="destructive" onClick={() => endGuidance(c.user_id)}>Akhiri</Button>
                             )}
-                            {c.guidance_status === 'selesai' && !terminationReports.some(t => t.client_id === c.user_id) && (
+                            {c.guidance_status === 'selesai' && !termReport && (
                               <Button size="sm" variant="outline" onClick={() => openTerminationDialog(c)} className="text-destructive border-destructive/50">
-                                <FileText className="w-3 h-3 mr-1" /> Laporan Pengakhiran
+                                <Upload className="w-3 h-3 mr-1" /> Upload Pengakhiran
                               </Button>
                             )}
-                            {terminationReports.some(t => t.client_id === c.user_id) && (
-                              <Badge className="bg-green-600 hover:bg-green-700 gap-1">
-                                <CheckCircle className="w-3 h-3" /> Sudah Dilaporkan
-                              </Badge>
+                            {termReport && (
+                              <div className="flex items-center gap-1">
+                                <Badge className="bg-green-600 hover:bg-green-700 gap-1">
+                                  <CheckCircle className="w-3 h-3" /> Sudah Dilaporkan
+                                </Badge>
+                                {termReport.file_url && (
+                                  <a href={termReport.file_url} target="_blank" rel="noopener noreferrer">
+                                    <Badge variant="outline" className="gap-1"><FileText className="w-3 h-3" /> PDF</Badge>
+                                  </a>
+                                )}
+                              </div>
                             )}
                           </div>
                         </td>
@@ -867,10 +839,8 @@ export default function PegawaiDashboard() {
           )}
         </div>
 
-        {/* Chat - rendered as floating widget outside container */}
-
         {/* Statistics */}
-        <StatistikDashboard clients={displayedClients} monthlyReports={monthlyReports} />
+        <StatistikDashboard clients={displayedClients} monthlyReports={[]} />
 
         {/* Edit Program Dialog */}
         <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
@@ -906,8 +876,7 @@ export default function PegawaiDashboard() {
           </DialogContent>
         </Dialog>
 
-
-        {/* Termination Report Dialog */}
+        {/* Termination Report Dialog with Upload */}
         <Dialog open={terminationDialogOpen} onOpenChange={setTerminationDialogOpen}>
           <DialogContent className="bg-card border-border">
             <DialogHeader><DialogTitle>Laporan Pengakhiran</DialogTitle></DialogHeader>
@@ -916,7 +885,18 @@ export default function PegawaiDashboard() {
             </p>
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label>Catatan Pengakhiran</Label>
+                <Label>Upload File Laporan Pengakhiran (PDF)</Label>
+                <Input
+                  type="file"
+                  accept=".pdf"
+                  ref={terminationFileRef}
+                  onChange={e => setTerminationFile(e.target.files?.[0] || null)}
+                  className="file:mr-2 file:py-1 file:px-3 file:rounded file:border-0 file:text-sm file:bg-primary file:text-primary-foreground"
+                />
+                <p className="text-xs text-muted-foreground">Maksimal 10MB, format PDF</p>
+              </div>
+              <div className="space-y-2">
+                <Label>Catatan Pengakhiran (Opsional)</Label>
                 <Textarea
                   value={terminationNotes}
                   onChange={e => setTerminationNotes(e.target.value)}
@@ -924,7 +904,10 @@ export default function PegawaiDashboard() {
                   rows={4}
                 />
               </div>
-              <Button onClick={submitTerminationReport} className="w-full">Simpan Laporan</Button>
+              <Button onClick={submitTerminationReport} disabled={uploadingTermination} className="w-full gap-2">
+                <Upload className="w-4 h-4" />
+                {uploadingTermination ? 'Mengupload...' : 'Simpan Laporan Pengakhiran'}
+              </Button>
             </div>
           </DialogContent>
         </Dialog>
@@ -1011,9 +994,6 @@ export default function PegawaiDashboard() {
           </DialogContent>
         </Dialog>
       </div>
-
-      {/* Floating Chat Widget */}
-      <PegawaiChatList clients={displayedClients.map(c => ({ user_id: c.user_id, profile: (c as any).profile }))} />
     </div>
   );
 }
