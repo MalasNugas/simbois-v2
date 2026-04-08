@@ -6,11 +6,13 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Users, Search, AlertTriangle, CheckCircle2, Clock, ShieldCheck, CalendarDays } from 'lucide-react';
+import { Users, Search, AlertTriangle, CheckCircle2, Clock, ShieldCheck, CalendarDays, FileText, Eye } from 'lucide-react';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
+import { format } from 'date-fns';
 
 interface PegawaiData {
   user_id: string;
@@ -18,9 +20,9 @@ interface PegawaiData {
   totalClients: number;
   activeClients: number;
   needsTermination: number;
-  terminated: number; // guidance_status 'selesai'
-  hasTerminationReport: number; // has filed termination report
-  pendingReport: number; // selesai but no report
+  terminated: number;
+  hasTerminationReport: number;
+  pendingReport: number;
   clients: ClientDetail[];
 }
 
@@ -35,6 +37,7 @@ interface ClientDetail {
   client_status: string | null;
   needsTermination: boolean;
   hasReport: boolean;
+  termReport: any | null;
 }
 
 export default function AdminDashboard() {
@@ -48,6 +51,12 @@ export default function AdminDashboard() {
   const [guidanceDialogOpen, setGuidanceDialogOpen] = useState(false);
   const [guidanceClient, setGuidanceClient] = useState<ClientDetail | null>(null);
   const [guidanceForm, setGuidanceForm] = useState({ guidance_start: '', guidance_end: '' });
+  const [litmasDialogOpen, setLitmasDialogOpen] = useState(false);
+  const [litmasClient, setLitmasClient] = useState<ClientDetail | null>(null);
+  const [litmasValue, setLitmasValue] = useState('');
+  const [termViewDialogOpen, setTermViewDialogOpen] = useState(false);
+  const [termViewReport, setTermViewReport] = useState<any>(null);
+  const [termViewClientName, setTermViewClientName] = useState('');
 
   useEffect(() => {
     if (!authLoading && role !== 'admin') {
@@ -57,9 +66,7 @@ export default function AdminDashboard() {
   }, [authLoading, role, navigate]);
 
   useEffect(() => {
-    if (role === 'admin') {
-      loadData();
-    }
+    if (role === 'admin') loadData();
   }, [role]);
 
   const loadData = async () => {
@@ -73,7 +80,7 @@ export default function AdminDashboard() {
       ]);
 
       const profileMap = new Map(allProfiles?.map(p => [p.user_id, p.full_name]) || []);
-      const termReportClientIds = new Set((termReports || []).map((t: any) => t.client_id));
+      const termReportMap = new Map((termReports || []).map((t: any) => [t.client_id, t]));
       const now = new Date();
 
       const pegawaiData: PegawaiData[] = (pegawaiUsers || []).map((p: any) => {
@@ -82,10 +89,9 @@ export default function AdminDashboard() {
         const clientDetails: ClientDetail[] = myClients.map(c => {
           const guidanceEndPassed = c.guidance_end && new Date(c.guidance_end) < now;
           const stillActive = c.guidance_status === 'aktif';
-          const hasReport = termReportClientIds.has(c.user_id);
+          const report = termReportMap.get(c.user_id) || null;
           return {
-            id: c.id,
-            user_id: c.user_id,
+            id: c.id, user_id: c.user_id,
             full_name: profileMap.get(c.user_id) || 'Unknown',
             case_number: c.case_number,
             guidance_status: c.guidance_status,
@@ -93,7 +99,8 @@ export default function AdminDashboard() {
             guidance_end: c.guidance_end,
             client_status: c.client_status,
             needsTermination: !!(guidanceEndPassed && stillActive),
-            hasReport,
+            hasReport: !!report,
+            termReport: report,
           };
         });
 
@@ -105,8 +112,8 @@ export default function AdminDashboard() {
           activeClients: myClients.filter(c => c.guidance_status === 'aktif').length,
           needsTermination: clientDetails.filter(c => c.needsTermination).length,
           terminated: terminatedClients.length,
-          hasTerminationReport: terminatedClients.filter(c => termReportClientIds.has(c.user_id)).length,
-          pendingReport: terminatedClients.filter(c => !termReportClientIds.has(c.user_id)).length,
+          hasTerminationReport: terminatedClients.filter(c => termReportMap.has(c.user_id)).length,
+          pendingReport: terminatedClients.filter(c => !termReportMap.has(c.user_id)).length,
           clients: clientDetails,
         };
       });
@@ -121,10 +128,7 @@ export default function AdminDashboard() {
 
   const openGuidanceDialog = (client: ClientDetail) => {
     setGuidanceClient(client);
-    setGuidanceForm({
-      guidance_start: client.guidance_start || '',
-      guidance_end: client.guidance_end || '',
-    });
+    setGuidanceForm({ guidance_start: client.guidance_start || '', guidance_end: client.guidance_end || '' });
     setGuidanceDialogOpen(true);
   };
 
@@ -137,6 +141,35 @@ export default function AdminDashboard() {
     if (error) { toast.error(error.message); return; }
     toast.success('Masa bimbingan berhasil diperbarui');
     setGuidanceDialogOpen(false);
+    loadData();
+  };
+
+  const openLitmasDialog = (client: ClientDetail) => {
+    setLitmasClient(client);
+    setLitmasValue(client.case_number || '');
+    setLitmasDialogOpen(true);
+  };
+
+  const saveLitmas = async () => {
+    if (!litmasClient) return;
+    const { error } = await supabase.from('clients').update({ case_number: litmasValue || null } as any).eq('user_id', litmasClient.user_id);
+    if (error) { toast.error(error.message); return; }
+    toast.success('No. Litmas berhasil diperbarui');
+    setLitmasDialogOpen(false);
+    loadData();
+  };
+
+  const openTermViewDialog = (report: any, clientName: string) => {
+    setTermViewReport(report);
+    setTermViewClientName(clientName);
+    setTermViewDialogOpen(true);
+  };
+
+  const approveTermination = async (reportId: string, status: 'approved' | 'rejected') => {
+    const { error } = await supabase.from('termination_reports' as any).update({ approval_status: status }).eq('id', reportId);
+    if (error) { toast.error(error.message); return; }
+    toast.success(status === 'approved' ? 'Laporan pengakhiran disetujui' : 'Laporan pengakhiran ditolak');
+    setTermViewDialogOpen(false);
     loadData();
   };
 
@@ -230,38 +263,12 @@ export default function AdminDashboard() {
           <CardContent className="p-4 flex flex-col sm:flex-row gap-3">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                placeholder="Cari nama pegawai..."
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-                className="pl-10"
-              />
+              <Input placeholder="Cari nama pegawai..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-10" />
             </div>
             <div className="flex gap-2">
-              <button
-                onClick={() => setFilterStatus('all')}
-                className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                  filterStatus === 'all' ? 'bg-primary text-primary-foreground' : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
-                }`}
-              >
-                Semua
-              </button>
-              <button
-                onClick={() => setFilterStatus('pending')}
-                className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                  filterStatus === 'pending' ? 'bg-destructive text-destructive-foreground' : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
-                }`}
-              >
-                Belum Lapor
-              </button>
-              <button
-                onClick={() => setFilterStatus('done')}
-                className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                  filterStatus === 'done' ? 'bg-green-600 text-white' : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
-                }`}
-              >
-                Sudah Selesai
-              </button>
+              <button onClick={() => setFilterStatus('all')} className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${filterStatus === 'all' ? 'bg-primary text-primary-foreground' : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'}`}>Semua</button>
+              <button onClick={() => setFilterStatus('pending')} className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${filterStatus === 'pending' ? 'bg-destructive text-destructive-foreground' : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'}`}>Belum Lapor</button>
+              <button onClick={() => setFilterStatus('done')} className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${filterStatus === 'done' ? 'bg-green-600 text-white' : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'}`}>Sudah Selesai</button>
             </div>
           </CardContent>
         </Card>
@@ -293,46 +300,27 @@ export default function AdminDashboard() {
                 <TableBody>
                   {filteredPegawai.map((p, idx) => (
                     <>
-                      <TableRow
-                        key={p.user_id}
-                        className="cursor-pointer hover:bg-muted/50"
-                        onClick={() => setExpandedPegawai(expandedPegawai === p.user_id ? null : p.user_id)}
-                      >
+                      <TableRow key={p.user_id} className="cursor-pointer hover:bg-muted/50" onClick={() => setExpandedPegawai(expandedPegawai === p.user_id ? null : p.user_id)}>
                         <TableCell>{idx + 1}</TableCell>
                         <TableCell className="font-medium">{p.full_name}</TableCell>
                         <TableCell className="text-center">{p.totalClients}</TableCell>
                         <TableCell className="text-center">{p.activeClients}</TableCell>
                         <TableCell className="text-center">
-                          {p.needsTermination > 0 ? (
-                            <Badge variant="destructive">{p.needsTermination}</Badge>
-                          ) : (
-                            <span className="text-muted-foreground">0</span>
-                          )}
+                          {p.needsTermination > 0 ? <Badge variant="destructive">{p.needsTermination}</Badge> : <span className="text-muted-foreground">0</span>}
                         </TableCell>
                         <TableCell className="text-center">{p.terminated}</TableCell>
                         <TableCell className="text-center">
-                          {p.hasTerminationReport > 0 ? (
-                            <Badge className="bg-green-600 hover:bg-green-700">{p.hasTerminationReport}</Badge>
-                          ) : (
-                            <span className="text-muted-foreground">0</span>
-                          )}
-                          {p.pendingReport > 0 && (
-                            <Badge variant="destructive" className="ml-1">{p.pendingReport} belum</Badge>
-                          )}
+                          {p.hasTerminationReport > 0 && <Badge className="bg-green-600 hover:bg-green-700">{p.hasTerminationReport}</Badge>}
+                          {p.pendingReport > 0 && <Badge variant="destructive" className="ml-1">{p.pendingReport} belum</Badge>}
+                          {p.hasTerminationReport === 0 && p.pendingReport === 0 && <span className="text-muted-foreground">0</span>}
                         </TableCell>
                         <TableCell className="text-center">
                           {p.needsTermination > 0 || p.pendingReport > 0 ? (
-                            <Badge variant="destructive" className="gap-1">
-                              <Clock className="w-3 h-3" /> Belum Lengkap
-                            </Badge>
+                            <Badge variant="destructive" className="gap-1"><Clock className="w-3 h-3" /> Belum Lengkap</Badge>
                           ) : p.terminated > 0 && p.hasTerminationReport === p.terminated ? (
-                            <Badge className="gap-1 bg-green-600 hover:bg-green-700">
-                              <CheckCircle2 className="w-3 h-3" /> Selesai
-                            </Badge>
+                            <Badge className="gap-1 bg-green-600 hover:bg-green-700"><CheckCircle2 className="w-3 h-3" /> Selesai</Badge>
                           ) : (
-                            <Badge variant="secondary" className="gap-1">
-                              <Clock className="w-3 h-3" /> Dalam Proses
-                            </Badge>
+                            <Badge variant="secondary" className="gap-1"><Clock className="w-3 h-3" /> Dalam Proses</Badge>
                           )}
                         </TableCell>
                       </TableRow>
@@ -346,12 +334,11 @@ export default function AdminDashboard() {
                                   <TableRow>
                                     <TableHead>Nama Klien</TableHead>
                                     <TableHead>No. Litmas</TableHead>
-                                    <TableHead>Status Klien</TableHead>
                                     <TableHead>Status Bimbingan</TableHead>
-                                     <TableHead>Masa Bimbingan</TableHead>
-                                     <TableHead>Laporan Pengakhiran</TableHead>
-                                     <TableHead>Keterangan</TableHead>
-                                     <TableHead>Aksi</TableHead>
+                                    <TableHead>Masa Bimbingan</TableHead>
+                                    <TableHead>Laporan Pengakhiran</TableHead>
+                                    <TableHead>Keterangan</TableHead>
+                                    <TableHead>Aksi</TableHead>
                                   </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -360,28 +347,22 @@ export default function AdminDashboard() {
                                       <TableCell>{c.full_name}</TableCell>
                                       <TableCell>{c.case_number || '-'}</TableCell>
                                       <TableCell>
-                                        <Badge variant="outline" className="capitalize">{c.client_status || 'aktif'}</Badge>
-                                      </TableCell>
-                                      <TableCell>
-                                        <Badge variant={c.guidance_status === 'aktif' ? 'default' : 'secondary'} className="capitalize">
-                                          {c.guidance_status || '-'}
-                                        </Badge>
+                                        <Badge variant={c.guidance_status === 'aktif' ? 'default' : 'secondary'} className="capitalize">{c.guidance_status || '-'}</Badge>
                                       </TableCell>
                                       <TableCell className="text-xs">
-                                        {c.guidance_start && c.guidance_end
-                                          ? `${c.guidance_start} s/d ${c.guidance_end}`
-                                          : '-'}
+                                        {c.guidance_start && c.guidance_end ? `${c.guidance_start} s/d ${c.guidance_end}` : '-'}
                                       </TableCell>
                                       <TableCell>
                                         {c.guidance_status === 'selesai' ? (
                                           c.hasReport ? (
-                                            <Badge className="bg-green-600 hover:bg-green-700 gap-1">
-                                              <CheckCircle2 className="w-3 h-3" /> Sudah
-                                            </Badge>
+                                            <div className="flex items-center gap-1">
+                                              <Badge className="bg-green-600 hover:bg-green-700 gap-1"><CheckCircle2 className="w-3 h-3" /> Sudah</Badge>
+                                              {c.termReport?.approval_status === 'approved' && <Badge className="bg-green-700 text-xs">ACC</Badge>}
+                                              {c.termReport?.approval_status === 'rejected' && <Badge variant="destructive" className="text-xs">Ditolak</Badge>}
+                                              {c.termReport?.approval_status === 'pending' && <Badge variant="secondary" className="text-xs">Menunggu ACC</Badge>}
+                                            </div>
                                           ) : (
-                                            <Badge variant="destructive" className="gap-1">
-                                              <Clock className="w-3 h-3" /> Belum Dibuat
-                                            </Badge>
+                                            <Badge variant="destructive" className="gap-1"><Clock className="w-3 h-3" /> Belum Dibuat</Badge>
                                           )
                                         ) : (
                                           <span className="text-muted-foreground text-xs">-</span>
@@ -389,27 +370,31 @@ export default function AdminDashboard() {
                                       </TableCell>
                                       <TableCell>
                                         {c.needsTermination ? (
-                                          <Badge variant="destructive" className="gap-1">
-                                            <AlertTriangle className="w-3 h-3" /> Perlu Pengakhiran
-                                          </Badge>
+                                          <Badge variant="destructive" className="gap-1"><AlertTriangle className="w-3 h-3" /> Perlu Pengakhiran</Badge>
                                         ) : c.guidance_status === 'selesai' ? (
                                           c.hasReport ? (
-                                            <Badge className="bg-green-600 hover:bg-green-700 gap-1">
-                                              <CheckCircle2 className="w-3 h-3" /> Selesai
-                                            </Badge>
+                                            <Badge className="bg-green-600 hover:bg-green-700 gap-1"><CheckCircle2 className="w-3 h-3" /> Selesai</Badge>
                                           ) : (
-                                            <Badge variant="secondary" className="gap-1">
-                                              <Clock className="w-3 h-3" /> Menunggu Laporan
-                                            </Badge>
+                                            <Badge variant="secondary" className="gap-1"><Clock className="w-3 h-3" /> Menunggu Laporan</Badge>
                                           )
                                         ) : (
                                           <span className="text-muted-foreground text-xs">-</span>
                                         )}
-                                       </TableCell>
+                                      </TableCell>
                                       <TableCell>
-                                        <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); openGuidanceDialog(c); }} title="Atur Masa Bimbingan">
-                                          <CalendarDays className="w-3 h-3 mr-1" /> Masa
-                                        </Button>
+                                        <div className="flex gap-1 flex-wrap">
+                                          <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); openGuidanceDialog(c); }} title="Atur Masa Bimbingan">
+                                            <CalendarDays className="w-3 h-3 mr-1" /> Masa
+                                          </Button>
+                                          <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); openLitmasDialog(c); }} title="Atur No. Litmas">
+                                            <FileText className="w-3 h-3 mr-1" /> Litmas
+                                          </Button>
+                                          {c.hasReport && c.termReport && (
+                                            <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); openTermViewDialog(c.termReport, c.full_name); }} title="Lihat Laporan Pengakhiran">
+                                              <Eye className="w-3 h-3 mr-1" /> Lihat
+                                            </Button>
+                                          )}
+                                        </div>
                                       </TableCell>
                                     </TableRow>
                                   ))}
@@ -431,9 +416,7 @@ export default function AdminDashboard() {
         <Dialog open={guidanceDialogOpen} onOpenChange={setGuidanceDialogOpen}>
           <DialogContent className="bg-card border-border">
             <DialogHeader><DialogTitle>Atur Masa Bimbingan</DialogTitle></DialogHeader>
-            <p className="text-sm text-muted-foreground mb-2">
-              Klien: <strong>{guidanceClient?.full_name}</strong>
-            </p>
+            <p className="text-sm text-muted-foreground mb-2">Klien: <strong>{guidanceClient?.full_name}</strong></p>
             <div className="space-y-4">
               <div className="space-y-2">
                 <Label>Tanggal Mulai Bimbingan</Label>
@@ -445,6 +428,62 @@ export default function AdminDashboard() {
               </div>
               <Button onClick={saveGuidancePeriod} className="w-full">Simpan</Button>
             </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* No. Litmas Dialog */}
+        <Dialog open={litmasDialogOpen} onOpenChange={setLitmasDialogOpen}>
+          <DialogContent className="bg-card border-border">
+            <DialogHeader><DialogTitle>Atur No. Litmas</DialogTitle></DialogHeader>
+            <p className="text-sm text-muted-foreground mb-2">Klien: <strong>{litmasClient?.full_name}</strong></p>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>No. Litmas / Nomor Register</Label>
+                <Input value={litmasValue} onChange={e => setLitmasValue(e.target.value)} placeholder="Contoh: 451/BKD/CB/XII/2025" />
+              </div>
+              <Button onClick={saveLitmas} className="w-full">Simpan</Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Termination Report View & Approval Dialog */}
+        <Dialog open={termViewDialogOpen} onOpenChange={setTermViewDialogOpen}>
+          <DialogContent className="bg-card border-border max-w-lg">
+            <DialogHeader><DialogTitle>Laporan Pengakhiran</DialogTitle></DialogHeader>
+            {termViewReport && (
+              <div className="space-y-4">
+                <div className="space-y-2 text-sm">
+                  <p><span className="text-muted-foreground">Klien:</span> <strong>{termViewClientName}</strong></p>
+                  <p><span className="text-muted-foreground">Tanggal Laporan:</span> {termViewReport.report_date ? format(new Date(termViewReport.report_date), 'dd MMM yyyy') : '-'}</p>
+                  <p><span className="text-muted-foreground">Catatan:</span> {termViewReport.notes || '-'}</p>
+                  <p><span className="text-muted-foreground">Status:</span>{' '}
+                    {termViewReport.approval_status === 'approved' ? <Badge className="bg-green-600">Disetujui</Badge> :
+                     termViewReport.approval_status === 'rejected' ? <Badge variant="destructive">Ditolak</Badge> :
+                     <Badge variant="secondary">Menunggu Persetujuan</Badge>}
+                  </p>
+                </div>
+                {termViewReport.file_url && (
+                  <div className="border rounded-lg overflow-hidden">
+                    <iframe src={termViewReport.file_url} className="w-full h-[400px]" title="Laporan Pengakhiran PDF" />
+                    <div className="p-2 bg-muted/30">
+                      <a href={termViewReport.file_url} target="_blank" rel="noopener noreferrer" className="text-sm text-primary underline flex items-center gap-1">
+                        <FileText className="w-4 h-4" /> Buka PDF di tab baru
+                      </a>
+                    </div>
+                  </div>
+                )}
+                {termViewReport.approval_status === 'pending' && (
+                  <div className="flex gap-3">
+                    <Button onClick={() => approveTermination(termViewReport.id, 'approved')} className="flex-1 bg-green-600 hover:bg-green-700">
+                      <CheckCircle2 className="w-4 h-4 mr-1" /> Setujui (ACC)
+                    </Button>
+                    <Button variant="destructive" onClick={() => approveTermination(termViewReport.id, 'rejected')} className="flex-1">
+                      Tolak
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
           </DialogContent>
         </Dialog>
       </div>

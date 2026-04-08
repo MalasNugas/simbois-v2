@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useAuth } from '@/lib/auth';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { User, BookOpen, MapPin, Briefcase, Calendar as CalendarIcon, Clock, ShieldCheck, Pencil } from 'lucide-react';
+import { User, BookOpen, MapPin, Briefcase, Calendar as CalendarIcon, Clock, ShieldCheck, Pencil, Camera } from 'lucide-react';
 import { format } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
@@ -29,10 +29,12 @@ export default function KlienDashboard() {
   const [registrations, setRegistrations] = useState<any[]>([]);
   const [pkName, setPkName] = useState<string | null>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [editForm, setEditForm] = useState({ full_name: '', gender: '', phone: '', address: '', case_number: '' });
+  const [editForm, setEditForm] = useState({ full_name: '', gender: '', phone: '', address: '', birth_date: '' });
   const [savingEmployment, setSavingEmployment] = useState(false);
   const [pegawaiList, setPegawaiList] = useState<{ user_id: string; full_name: string }[]>([]);
   const [savingPk, setSavingPk] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -71,7 +73,13 @@ export default function KlienDashboard() {
     ]);
     const p = profileRes.data;
     setProfile(p);
-    if (p) setEditForm({ full_name: p.full_name || '', gender: (p as any).gender || '', phone: p.phone || '', address: p.address || '', case_number: (clientRes.data as any)?.case_number || '' });
+    if (p) setEditForm({
+      full_name: p.full_name || '',
+      gender: (p as any).gender || '',
+      phone: p.phone || '',
+      address: p.address || '',
+      birth_date: (p as any).birth_date || '',
+    });
     setClient(clientRes.data);
     setPrograms(programsRes.data || []);
     setRegistrations(regsRes.data || []);
@@ -93,13 +101,26 @@ export default function KlienDashboard() {
       gender: editForm.gender || null,
       phone: editForm.phone || null,
       address: editForm.address || null,
+      birth_date: editForm.birth_date || null,
     } as any).eq('user_id', user!.id);
     if (error) { toast.error(error.message); return; }
-    if (editForm.case_number !== undefined) {
-      await supabase.from('clients').update({ case_number: editForm.case_number || null }).eq('user_id', user!.id);
-    }
     toast.success('Profil berhasil diperbarui');
     setEditDialogOpen(false);
+    loadData();
+  };
+
+  const uploadAvatar = async (file: File) => {
+    if (!file.type.startsWith('image/')) { toast.error('Hanya file gambar yang diizinkan'); return; }
+    if (file.size > 5 * 1024 * 1024) { toast.error('Ukuran file maksimal 5MB'); return; }
+    setUploadingAvatar(true);
+    const fileName = `${user!.id}/avatar.${file.name.split('.').pop()}`;
+    const { error } = await supabase.storage.from('client-avatars').upload(fileName, file, { upsert: true });
+    if (error) { toast.error('Gagal upload: ' + error.message); setUploadingAvatar(false); return; }
+    const { data: urlData } = supabase.storage.from('client-avatars').getPublicUrl(fileName);
+    const avatarUrl = `${urlData.publicUrl}?t=${Date.now()}`;
+    await supabase.from('profiles').update({ avatar_url: avatarUrl } as any).eq('user_id', user!.id);
+    setUploadingAvatar(false);
+    toast.success('Foto berhasil diupload');
     loadData();
   };
 
@@ -163,9 +184,37 @@ export default function KlienDashboard() {
                 <Pencil className="w-4 h-4" />
               </Button>
             </div>
+            {/* Avatar */}
+            <div className="flex flex-col items-center mb-4">
+              <div className="relative group">
+                <div className="w-24 h-24 rounded-full overflow-hidden bg-muted flex items-center justify-center border-2 border-primary/20">
+                  {profile?.avatar_url ? (
+                    <img src={profile.avatar_url} alt="Foto Profil" className="w-full h-full object-cover" />
+                  ) : (
+                    <User className="w-10 h-10 text-muted-foreground" />
+                  )}
+                </div>
+                <button
+                  onClick={() => avatarInputRef.current?.click()}
+                  disabled={uploadingAvatar}
+                  className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-md hover:bg-primary/90 transition-colors"
+                >
+                  <Camera className="w-4 h-4" />
+                </button>
+                <input
+                  ref={avatarInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={e => { if (e.target.files?.[0]) uploadAvatar(e.target.files[0]); }}
+                />
+              </div>
+              {uploadingAvatar && <p className="text-xs text-muted-foreground mt-1">Mengupload...</p>}
+            </div>
             <div className="space-y-2 text-sm">
               <p><span className="text-muted-foreground">Nama:</span> {profile?.full_name}</p>
               <p><span className="text-muted-foreground">Email:</span> {user?.email}</p>
+              <p><span className="text-muted-foreground">Tanggal Lahir:</span> {(profile as any)?.birth_date ? format(new Date((profile as any).birth_date), 'dd MMM yyyy') : '-'}</p>
               <p><span className="text-muted-foreground">Jenis Kelamin:</span> {genderLabel[(profile as any)?.gender] || '-'}</p>
               <p><span className="text-muted-foreground">Telepon:</span> {profile?.phone || '-'}</p>
               <p><span className="text-muted-foreground">Alamat:</span> {profile?.address || '-'}</p>
@@ -298,7 +347,7 @@ export default function KlienDashboard() {
           )}
         </div>
 
-        {/* Edit Profile Dialog */}
+        {/* Edit Profile Dialog - No Litmas (admin only) */}
         <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
           <DialogContent className="bg-card border-border">
             <DialogHeader><DialogTitle>Edit Profil</DialogTitle></DialogHeader>
@@ -306,6 +355,10 @@ export default function KlienDashboard() {
               <div className="space-y-2">
                 <Label>Nama Lengkap</Label>
                 <Input value={editForm.full_name} onChange={e => setEditForm(f => ({ ...f, full_name: e.target.value }))} />
+              </div>
+              <div className="space-y-2">
+                <Label>Tanggal Lahir</Label>
+                <Input type="date" value={editForm.birth_date} onChange={e => setEditForm(f => ({ ...f, birth_date: e.target.value }))} />
               </div>
               <div className="space-y-2">
                 <Label>Jenis Kelamin</Label>
@@ -324,10 +377,6 @@ export default function KlienDashboard() {
               <div className="space-y-2">
                 <Label>Alamat</Label>
                 <Textarea value={editForm.address} onChange={e => setEditForm(f => ({ ...f, address: e.target.value }))} placeholder="Masukkan alamat lengkap" />
-              </div>
-              <div className="space-y-2">
-                <Label>No. Litmas</Label>
-                <Input value={editForm.case_number} onChange={e => setEditForm(f => ({ ...f, case_number: e.target.value }))} placeholder="Masukkan No. Litmas" />
               </div>
               <Button onClick={saveProfile} className="w-full">Simpan Profil</Button>
             </div>
