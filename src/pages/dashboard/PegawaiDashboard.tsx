@@ -1016,6 +1016,11 @@ export default function PegawaiDashboard() {
                                 <Upload className="w-3 h-3 mr-1" /> Upload Pengakhiran
                               </Button>
                             )}
+                            {c.guidance_status === 'selesai' && (
+                              <Button size="sm" variant="outline" onClick={() => openSuratPengakhiranDialog(c)}>
+                                <ScrollText className="w-3 h-3 mr-1" /> Surat Pengakhiran
+                              </Button>
+                            )}
                             {termReport && (
                               <div className="flex items-center gap-1">
                                 <Badge className="bg-green-600 hover:bg-green-700 gap-1">
