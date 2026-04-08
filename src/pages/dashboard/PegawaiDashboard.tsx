@@ -254,6 +254,195 @@ export default function PegawaiDashboard() {
     setLaporanDialogOpen(true);
   };
 
+  const openSuratPengakhiranDialog = (client: any) => {
+    setSuratPengakhiranClient(client);
+    setSuratPengakhiranForm({
+      nomor_surat: '',
+      alasan_pengakhiran: 'Selesai masa bimbingan',
+      nomor_sk: '',
+      perihal_sk: 'Cuti Bersyarat Narapidana',
+      tanggal_sk: '',
+      kepala_nama: '',
+    });
+    setSuratPengakhiranDialogOpen(true);
+  };
+
+  const generateSuratPengakhiranPdf = async () => {
+    if (!suratPengakhiranClient) return;
+    const profile = (suratPengakhiranClient as any).profile;
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const pw = doc.internal.pageSize.getWidth();
+    const margin = 25;
+    let y = 18;
+
+    // Load logo
+    try {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      await new Promise<void>((resolve) => {
+        img.onload = () => resolve();
+        img.onerror = () => resolve();
+        img.src = logoImipas;
+      });
+      if (img.complete && img.naturalWidth > 0) {
+        doc.addImage(img, 'PNG', margin, y - 5, 22, 22);
+      }
+    } catch {}
+
+    // Header
+    const headerX = margin + 25;
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'bold');
+    doc.text('KEMENTERIAN IMIGRASI DAN PEMASYARAKATAN REPUBLIK INDONESIA', pw / 2 + 5, y, { align: 'center' });
+    y += 4;
+    doc.text('DIREKTORAT JENDERAL PEMASYARAKATAN', pw / 2 + 5, y, { align: 'center' });
+    y += 4;
+    doc.text('KANTOR WILAYAH JAWA TIMUR', pw / 2 + 5, y, { align: 'center' });
+    y += 5;
+    doc.setFontSize(10);
+    doc.text('BALAI PEMASYARAKATAN KELAS I MALANG', pw / 2 + 5, y, { align: 'center' });
+    y += 5;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+    doc.text('Jalan Barito No. 1, Bunulrejo, Kota Malang, Jawa Timur', pw / 2 + 5, y, { align: 'center' });
+    y += 3.5;
+    doc.text('Laman: https://bapasmalang.kemenkumham.go.id, Pos-el: bapasmalang@gmail.com', pw / 2 + 5, y, { align: 'center' });
+    y += 4;
+
+    // Double line
+    doc.setLineWidth(0.8);
+    doc.line(margin, y, pw - margin, y);
+    y += 1.5;
+    doc.setLineWidth(0.3);
+    doc.line(margin, y, pw - margin, y);
+    y += 10;
+
+    // Title
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.text('SURAT PENGAKHIRAN', pw / 2, y, { align: 'center' });
+    y += 5;
+    const nomorSurat = suratPengakhiranForm.nomor_surat || 'WP.15.PAS.15-PK.06.04-........';
+    doc.setFontSize(10);
+    doc.text(`NOMOR: ${nomorSurat}`, pw / 2, y, { align: 'center' });
+    y += 10;
+
+    // Body
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    const introText = 'Kepala Balai Pemasyarakatan (BAPAS) Kelas I Malang, dengan ini menerangkan :';
+    doc.text(introText, margin, y);
+    y += 10;
+
+    // Identity table
+    const labelX = margin;
+    const colonX = margin + 45;
+    const valueX = margin + 50;
+
+    const birthDate = profile?.birth_date ? format(new Date(profile.birth_date), 'dd MMMM yyyy') : '-';
+    const birthPlace = profile?.address?.split(',')[0] || '-';
+    const tempatTglLahir = `${birthPlace}/ ${birthDate}`;
+
+    const items: [string, string][] = [
+      ['Nama', profile?.full_name || '-'],
+      ['Nomor Register', suratPengakhiranClient.case_number || '-'],
+      ['Tempat/ Tanggal Lahir', tempatTglLahir],
+      ['Alamat', profile?.address || '-'],
+    ];
+
+    items.forEach(([label, value]) => {
+      doc.setFont('helvetica', 'normal');
+      doc.text(label, labelX, y);
+      doc.text(':', colonX, y);
+      const lines = doc.splitTextToSize(value, pw - margin - valueX);
+      doc.text(lines, valueX, y);
+      y += lines.length * 5 + 1;
+    });
+    y += 5;
+
+    // SK paragraph
+    doc.setFontSize(10);
+    const tanggalSk = suratPengakhiranForm.tanggal_sk ? format(new Date(suratPengakhiranForm.tanggal_sk), 'dd MMMM yyyy') : '....................';
+    const nomorSk = suratPengakhiranForm.nomor_sk || '..........................';
+    const perihalSk = suratPengakhiranForm.perihal_sk;
+    const skText = `Sesuai dengan Surat Keputusan Menteri Imigrasi dan Pemasyarakatan Republik Indonesia tanggal ${tanggalSk} Nomor: ${nomorSk}, perihal ${perihalSk}.`;
+    const skLines = doc.splitTextToSize(skText, pw - margin * 2);
+    doc.text(skLines, margin, y, { align: 'justify' });
+    y += skLines.length * 5 + 5;
+
+    // Termination paragraph
+    const endDate = suratPengakhiranClient.guidance_end ? format(new Date(suratPengakhiranClient.guidance_end), 'EEEE') : '...........';
+    const endDateFull = suratPengakhiranClient.guidance_end ? format(new Date(suratPengakhiranClient.guidance_end), 'dd MMMM yyyy') : '...........';
+    
+    const alasanOptions = [
+      'Selesai masa bimbingan',
+      'Melanggar hukum lagi',
+      'Pindah alamat tanpa melapor dan tidak ditemukan alamat baru',
+      'Meninggal dunia',
+      'Pindah bimbingan ke Bapas lain',
+      'Melanggar syarat khusus pembimbingan',
+    ];
+    
+    const alasanText = alasanOptions.map(a => {
+      if (a === suratPengakhiranForm.alasan_pengakhiran) return a;
+      return a;
+    }).join(' / ');
+
+    const termText = `Pada hari ${endDate} tanggal ${endDateFull} masa bimbingan diakhiri karena telah ${suratPengakhiranForm.alasan_pengakhiran}.`;
+    const termLines = doc.splitTextToSize(termText, pw - margin * 2);
+    doc.text(termLines, margin, y);
+    y += termLines.length * 5 + 5;
+
+    const closingText = 'Demikian surat pengakhiran ini disampaikan. Atas perhatiaannya diucapkan terima kasih.';
+    const closingLines = doc.splitTextToSize(closingText, pw - margin * 2);
+    doc.text(closingLines, margin, y);
+    y += closingLines.length * 5 + 10;
+
+    // Signature
+    const sigX = pw / 2 + 10;
+    const dateSurat = format(new Date(), 'dd MMMM yyyy');
+    doc.text(`Malang, ${dateSurat}`, sigX, y);
+    y += 5;
+    doc.text('Kepala Bapas Kelas I Malang', sigX, y);
+    y += 30;
+    doc.setFont('helvetica', 'bold');
+    doc.text(suratPengakhiranForm.kepala_nama || '............................', sigX, y);
+    y += 15;
+
+    // Photo placeholder
+    if (profile?.avatar_url) {
+      try {
+        const imgResp = await fetch(profile.avatar_url);
+        const blob = await imgResp.blob();
+        const reader = new FileReader();
+        await new Promise<void>((resolve) => {
+          reader.onload = () => {
+            const imgData = reader.result as string;
+            doc.addImage(imgData, 'JPEG', margin, y - 10, 30, 40);
+            resolve();
+          };
+          reader.onerror = () => resolve();
+          reader.readAsDataURL(blob);
+        });
+      } catch {}
+    }
+
+    y += 40;
+
+    // Tembusan
+    if (y > 260) { doc.addPage(); y = 20; }
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.text('Tembusan :', margin, y);
+    y += 5;
+    doc.text('1.  Arsip', margin, y);
+
+    const clientName = (profile?.full_name || 'klien').replace(/\s+/g, '_');
+    doc.save(`Surat_Pengakhiran_${clientName}_${format(new Date(), 'yyyy-MM-dd')}.pdf`);
+    toast.success('PDF Surat Pengakhiran berhasil di-generate');
+    setSuratPengakhiranDialogOpen(false);
+  };
+
   const generateLaporanBimbinganPdf = async () => {
     if (!laporanClient) return;
     const profile = (laporanClient as any).profile;
