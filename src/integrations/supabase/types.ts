@@ -193,6 +193,7 @@ export type Database = {
         Row: {
           address: string | null
           avatar_url: string | null
+          birth_date: string | null
           created_at: string | null
           full_name: string
           gender: string | null
@@ -205,6 +206,7 @@ export type Database = {
         Insert: {
           address?: string | null
           avatar_url?: string | null
+          birth_date?: string | null
           created_at?: string | null
           full_name: string
           gender?: string | null
@@ -217,6 +219,7 @@ export type Database = {
         Update: {
           address?: string | null
           avatar_url?: string | null
+          birth_date?: string | null
           created_at?: string | null
           full_name?: string
           gender?: string | null
@@ -319,6 +322,7 @@ export type Database = {
       }
       termination_reports: {
         Row: {
+          approval_status: string
           client_id: string
           created_at: string | null
           file_url: string | null
@@ -328,6 +332,7 @@ export type Database = {
           report_date: string
         }
         Insert: {
+          approval_status?: string
           client_id: string
           created_at?: string | null
           file_url?: string | null
@@ -337,6 +342,7 @@ export type Database = {
           report_date?: string
         }
         Update: {
+          approval_status?: string
           client_id?: string
           created_at?: string | null
           file_url?: string | null
