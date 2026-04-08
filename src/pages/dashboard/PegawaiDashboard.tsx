@@ -61,6 +61,16 @@ export default function PegawaiDashboard() {
     status_klien: 'CUTI BERSYARAT',
     nomor_surat: '',
   });
+  const [suratPengakhiranDialogOpen, setSuratPengakhiranDialogOpen] = useState(false);
+  const [suratPengakhiranClient, setSuratPengakhiranClient] = useState<any>(null);
+  const [suratPengakhiranForm, setSuratPengakhiranForm] = useState({
+    nomor_surat: '',
+    alasan_pengakhiran: 'Selesai masa bimbingan',
+    nomor_sk: '',
+    perihal_sk: 'Cuti Bersyarat Narapidana',
+    tanggal_sk: '',
+    kepala_nama: '',
+  });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const editFileInputRef = useRef<HTMLInputElement>(null);
   const terminationFileRef = useRef<HTMLInputElement>(null);
