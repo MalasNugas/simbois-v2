@@ -1090,15 +1090,24 @@ export default function PegawaiDashboard() {
                               </Button>
                             )}
                             {termReport && (
-                              <div className="flex items-center gap-1">
+                              <div className="flex items-center gap-1 flex-wrap">
                                 <Badge className="bg-green-600 hover:bg-green-700 gap-1">
-                                  <CheckCircle className="w-3 h-3" /> Sudah Dilaporkan
+                                  <CheckCircle className="w-3 h-3" /> Dilaporkan
                                 </Badge>
+                                {termReport.approval_status === 'approved' && <Badge className="bg-green-700 text-xs">ACC</Badge>}
+                                {termReport.approval_status === 'rejected' && <Badge variant="destructive" className="text-xs">Ditolak</Badge>}
+                                {termReport.approval_status === 'pending' && <Badge variant="secondary" className="text-xs">Menunggu</Badge>}
                                 {termReport.file_url && (
                                   <a href={termReport.file_url} target="_blank" rel="noopener noreferrer">
                                     <Badge variant="outline" className="gap-1"><FileText className="w-3 h-3" /> PDF</Badge>
                                   </a>
                                 )}
+                                <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={() => openEditTerminationDialog(c, termReport)} title="Edit Laporan">
+                                  <Pencil className="w-3 h-3" />
+                                </Button>
+                                <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-destructive" onClick={() => deleteTerminationReport(termReport.id)} title="Hapus Laporan">
+                                  <Trash2 className="w-3 h-3" />
+                                </Button>
                               </div>
                             )}
                           </div>
