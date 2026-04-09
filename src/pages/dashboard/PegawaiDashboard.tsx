@@ -191,6 +191,7 @@ export default function PegawaiDashboard() {
     setTerminationClient(client);
     setTerminationNotes('');
     setTerminationFile(null);
+    setEditingTermReportId(null);
     if (terminationFileRef.current) terminationFileRef.current.value = '';
     setTerminationDialogOpen(true);
   };
