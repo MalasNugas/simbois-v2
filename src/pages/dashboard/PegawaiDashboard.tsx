@@ -340,7 +340,7 @@ export default function PegawaiDashboard() {
     const valueX = margin + 50;
 
     const birthDate = profile?.birth_date ? format(new Date(profile.birth_date), 'dd MMMM yyyy') : '-';
-    const birthPlace = profile?.address?.split(',')[0] || '-';
+    const birthPlace = (profile as any)?.birth_place || '-';
     const tempatTglLahir = `${birthPlace}/ ${birthDate}`;
 
     const items: [string, string][] = [
@@ -370,30 +370,22 @@ export default function PegawaiDashboard() {
     doc.text(skLines, margin, y, { align: 'justify' });
     y += skLines.length * 5 + 5;
 
-    // Termination paragraph
-    const endDate = suratPengakhiranClient.guidance_end ? format(new Date(suratPengakhiranClient.guidance_end), 'EEEE') : '...........';
-    const endDateFull = suratPengakhiranClient.guidance_end ? format(new Date(suratPengakhiranClient.guidance_end), 'dd MMMM yyyy') : '...........';
-    
-    const alasanOptions = [
-      'Selesai masa bimbingan',
-      'Melanggar hukum lagi',
-      'Pindah alamat tanpa melapor dan tidak ditemukan alamat baru',
-      'Meninggal dunia',
-      'Pindah bimbingan ke Bapas lain',
-      'Melanggar syarat khusus pembimbingan',
-    ];
-    
-    const alasanText = alasanOptions.map(a => {
-      if (a === suratPengakhiranForm.alasan_pengakhiran) return a;
-      return a;
-    }).join(' / ');
+    // Termination paragraph - auto-generated with all options
+    const dayNames: Record<string, string> = {
+      Sunday: 'Minggu', Monday: 'Senin', Tuesday: 'Selasa', Wednesday: 'Rabu',
+      Thursday: 'Kamis', Friday: 'Jumat', Saturday: 'Sabtu',
+    };
+    const endDateObj = suratPengakhiranClient.guidance_end ? new Date(suratPengakhiranClient.guidance_end) : null;
+    const endDayEn = endDateObj ? format(endDateObj, 'EEEE') : '...........';
+    const endDay = dayNames[endDayEn] || endDayEn;
+    const endDateFull = endDateObj ? format(endDateObj, 'dd MMMM yyyy') : '...........';
 
-    const termText = `Pada hari ${endDate} tanggal ${endDateFull} masa bimbingan diakhiri karena telah ${suratPengakhiranForm.alasan_pengakhiran}.`;
+    const termText = `Pada hari ${endDay} tanggal ${endDateFull} masa bimbingan diakhiri karena telah Selesai masa bimbingan / Melanggar hukum lagi / Pindah alamat tanpa melapor dan tidak ditemukan alamat baru / Meninggal dunia / Pindah bimbingan ke Bapas lain / Melanggar syarat khusus pembimbingan (*coret yang tidak perlu).`;
     const termLines = doc.splitTextToSize(termText, pw - margin * 2);
     doc.text(termLines, margin, y);
     y += termLines.length * 5 + 5;
 
-    const closingText = 'Demikian surat pengakhiran ini disampaikan. Atas perhatiaannya diucapkan terima kasih.';
+    const closingText = 'Demikian surat pengakhiran ini disampaikan. Atas perhatiannya diucapkan terima kasih.';
     const closingLines = doc.splitTextToSize(closingText, pw - margin * 2);
     doc.text(closingLines, margin, y);
     y += closingLines.length * 5 + 10;
