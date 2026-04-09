@@ -1203,20 +1203,7 @@ export default function PegawaiDashboard() {
                 <Label className="text-xs">Nomor Surat</Label>
                 <Input value={suratPengakhiranForm.nomor_surat} onChange={e => setSuratPengakhiranForm(f => ({ ...f, nomor_surat: e.target.value }))} placeholder="WP.15.PAS.15-PK.06.04-..." />
               </div>
-              <div className="space-y-1">
-                <Label className="text-xs">Alasan Pengakhiran</Label>
-                <Select value={suratPengakhiranForm.alasan_pengakhiran} onValueChange={v => setSuratPengakhiranForm(f => ({ ...f, alasan_pengakhiran: v }))}>
-                  <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Selesai masa bimbingan">Selesai masa bimbingan</SelectItem>
-                    <SelectItem value="Melanggar hukum lagi">Melanggar hukum lagi</SelectItem>
-                    <SelectItem value="Pindah alamat tanpa melapor dan tidak ditemukan alamat baru">Pindah alamat tanpa melapor</SelectItem>
-                    <SelectItem value="Meninggal dunia">Meninggal dunia</SelectItem>
-                    <SelectItem value="Pindah bimbingan ke Bapas lain">Pindah bimbingan ke Bapas lain</SelectItem>
-                    <SelectItem value="Melanggar syarat khusus pembimbingan">Melanggar syarat khusus pembimbingan</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+              <p className="text-xs text-muted-foreground italic">Paragraf pengakhiran akan otomatis dibuat berdasarkan tanggal akhir bimbingan klien dengan semua opsi alasan (*coret yang tidak perlu).</p>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <Label className="text-xs">Nomor SK Menteri</Label>
