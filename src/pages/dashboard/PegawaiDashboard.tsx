@@ -1161,13 +1161,13 @@ export default function PegawaiDashboard() {
         {/* Termination Report Dialog with Upload */}
         <Dialog open={terminationDialogOpen} onOpenChange={setTerminationDialogOpen}>
           <DialogContent className="bg-card border-border">
-            <DialogHeader><DialogTitle>Laporan Pengakhiran</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle>{editingTermReportId ? 'Edit Laporan Pengakhiran' : 'Laporan Pengakhiran'}</DialogTitle></DialogHeader>
             <p className="text-sm text-muted-foreground mb-2">
               Klien: <strong>{(terminationClient as any)?.profile?.full_name}</strong>
             </p>
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label>Upload File Laporan Pengakhiran (PDF)</Label>
+                <Label>{editingTermReportId ? 'Ganti File (Opsional)' : 'Upload File Laporan Pengakhiran (PDF)'}</Label>
                 <Input
                   type="file"
                   accept=".pdf"
@@ -1186,9 +1186,9 @@ export default function PegawaiDashboard() {
                   rows={4}
                 />
               </div>
-              <Button onClick={submitTerminationReport} disabled={uploadingTermination} className="w-full gap-2">
+              <Button onClick={editingTermReportId ? updateTerminationReport : submitTerminationReport} disabled={uploadingTermination} className="w-full gap-2">
                 <Upload className="w-4 h-4" />
-                {uploadingTermination ? 'Mengupload...' : 'Simpan Laporan Pengakhiran'}
+                {uploadingTermination ? 'Mengupload...' : editingTermReportId ? 'Perbarui Laporan' : 'Simpan Laporan Pengakhiran'}
               </Button>
             </div>
           </DialogContent>
