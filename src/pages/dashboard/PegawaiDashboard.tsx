@@ -235,6 +235,46 @@ export default function PegawaiDashboard() {
     loadData();
   };
 
+  const [editingTermReportId, setEditingTermReportId] = useState<string | null>(null);
+
+  const openEditTerminationDialog = (client: any, report: any) => {
+    setTerminationClient(client);
+    setTerminationNotes(report.notes || '');
+    setTerminationFile(null);
+    setEditingTermReportId(report.id);
+    if (terminationFileRef.current) terminationFileRef.current.value = '';
+    setTerminationDialogOpen(true);
+  };
+
+  const updateTerminationReport = async () => {
+    if (!terminationClient || !editingTermReportId) return;
+    setUploadingTermination(true);
+    const updates: any = { notes: terminationNotes || null };
+    if (terminationFile) {
+      if (terminationFile.type !== 'application/pdf') { toast.error('Hanya file PDF'); setUploadingTermination(false); return; }
+      const fileName = `${Date.now()}-${terminationFile.name}`;
+      const { error: uploadError } = await supabase.storage.from('termination-files').upload(fileName, terminationFile);
+      if (uploadError) { toast.error('Gagal upload: ' + uploadError.message); setUploadingTermination(false); return; }
+      const { data: urlData } = supabase.storage.from('termination-files').getPublicUrl(fileName);
+      updates.file_url = urlData.publicUrl;
+    }
+    const { error } = await supabase.from('termination_reports' as any).update(updates).eq('id', editingTermReportId);
+    setUploadingTermination(false);
+    if (error) { toast.error(error.message); return; }
+    toast.success('Laporan pengakhiran berhasil diperbarui');
+    setTerminationDialogOpen(false);
+    setEditingTermReportId(null);
+    loadData();
+  };
+
+  const deleteTerminationReport = async (reportId: string) => {
+    if (!confirm('Apakah Anda yakin ingin menghapus laporan pengakhiran ini?')) return;
+    const { error } = await supabase.from('termination_reports' as any).delete().eq('id', reportId);
+    if (error) { toast.error(error.message); return; }
+    toast.success('Laporan pengakhiran berhasil dihapus');
+    loadData();
+  };
+
   const openLaporanDialog = (client: any) => {
     setLaporanClient(client);
     setLaporanForm({
