@@ -29,7 +29,7 @@ export default function KlienDashboard() {
   const [registrations, setRegistrations] = useState<any[]>([]);
   const [pkName, setPkName] = useState<string | null>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [editForm, setEditForm] = useState({ full_name: '', gender: '', phone: '', address: '', birth_date: '' });
+  const [editForm, setEditForm] = useState({ full_name: '', gender: '', phone: '', address: '', birth_date: '', birth_place: '' });
   const [savingEmployment, setSavingEmployment] = useState(false);
   const [pegawaiList, setPegawaiList] = useState<{ user_id: string; full_name: string }[]>([]);
   const [savingPk, setSavingPk] = useState(false);
@@ -79,6 +79,7 @@ export default function KlienDashboard() {
       phone: p.phone || '',
       address: p.address || '',
       birth_date: (p as any).birth_date || '',
+      birth_place: (p as any).birth_place || '',
     });
     setClient(clientRes.data);
     setPrograms(programsRes.data || []);
@@ -102,6 +103,7 @@ export default function KlienDashboard() {
       phone: editForm.phone || null,
       address: editForm.address || null,
       birth_date: editForm.birth_date || null,
+      birth_place: editForm.birth_place || null,
     } as any).eq('user_id', user!.id);
     if (error) { toast.error(error.message); return; }
     toast.success('Profil berhasil diperbarui');
@@ -214,6 +216,7 @@ export default function KlienDashboard() {
             <div className="space-y-2 text-sm">
               <p><span className="text-muted-foreground">Nama:</span> {profile?.full_name}</p>
               <p><span className="text-muted-foreground">Email:</span> {user?.email}</p>
+              <p><span className="text-muted-foreground">Tempat Lahir:</span> {(profile as any)?.birth_place || '-'}</p>
               <p><span className="text-muted-foreground">Tanggal Lahir:</span> {(profile as any)?.birth_date ? format(new Date((profile as any).birth_date), 'dd MMM yyyy') : '-'}</p>
               <p><span className="text-muted-foreground">Jenis Kelamin:</span> {genderLabel[(profile as any)?.gender] || '-'}</p>
               <p><span className="text-muted-foreground">Telepon:</span> {profile?.phone || '-'}</p>
@@ -355,6 +358,10 @@ export default function KlienDashboard() {
               <div className="space-y-2">
                 <Label>Nama Lengkap</Label>
                 <Input value={editForm.full_name} onChange={e => setEditForm(f => ({ ...f, full_name: e.target.value }))} />
+              </div>
+              <div className="space-y-2">
+                <Label>Tempat Lahir</Label>
+                <Input value={editForm.birth_place} onChange={e => setEditForm(f => ({ ...f, birth_place: e.target.value }))} placeholder="Contoh: Malang" />
               </div>
               <div className="space-y-2">
                 <Label>Tanggal Lahir</Label>
