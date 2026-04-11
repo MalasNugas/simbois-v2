@@ -311,14 +311,19 @@ export default function PegawaiDashboard() {
   const generateSuratPengakhiranPdf = async () => {
     if (!suratPengakhiranClient) return;
     const profile = (suratPengakhiranClient as any).profile;
-    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-    const pw = doc.internal.pageSize.getWidth(); // 210
-    const ph = doc.internal.pageSize.getHeight(); // 297
-    const margin = 25;
-    let y = 15;
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
+    const pw = doc.internal.pageSize.getWidth();   // 595 pt
+    const ph = doc.internal.pageSize.getHeight();   // 842 pt
+    const mLeft = 72;   // ~2.54 cm
+    const mRight = 65;  // ~2.29 cm
+    const contentW = pw - mLeft - mRight;
+    let y = 85; // ~3 cm from top
 
-    // ===== 1. KOP SURAT — center =====
-    // Logo on the left
+    // Helper: pt to mm for addImage
+    const ptToMm = (v: number) => v * 0.3528;
+
+    // ===== 1. KOP SURAT — rata tengah =====
+    // Logo on left
     try {
       const img = new Image();
       img.crossOrigin = 'anonymous';
@@ -328,110 +333,115 @@ export default function PegawaiDashboard() {
         img.src = logoImipas;
       });
       if (img.complete && img.naturalWidth > 0) {
-        doc.addImage(img, 'PNG', margin, y - 2, 18, 18);
+        // Logo ~50pt wide, positioned at mLeft
+        doc.addImage(img, 'PNG', mLeft, y - 8, 50, 50);
       }
     } catch {}
 
-    // Header text — centered
     const cx = pw / 2;
-    doc.setFontSize(7.5);
+    // Kop lines 1-3: 10.2pt Arial Regular (helvetica), all caps
+    doc.setFontSize(10.2);
     doc.setFont('helvetica', 'normal');
     doc.text('KEMENTERIAN IMIGRASI DAN PEMASYARAKATAN', cx, y, { align: 'center' });
-    y += 3.5;
-    doc.text('REPUBLIK INDONESIA', cx, y, { align: 'center' });
-    y += 3.5;
+    y += 13;
     doc.text('DIREKTORAT JENDERAL PEMASYARAKATAN', cx, y, { align: 'center' });
-    y += 3.5;
+    y += 13;
     doc.text('KANTOR WILAYAH JAWA TIMUR', cx, y, { align: 'center' });
-    y += 4.5;
-    doc.setFontSize(10);
+    y += 15;
+
+    // Kop line 4: 10.8pt Arial Bold
+    doc.setFontSize(10.8);
     doc.setFont('helvetica', 'bold');
     doc.text('BALAI PEMASYARAKATAN KELAS I MALANG', cx, y, { align: 'center' });
-    y += 4.5;
-    doc.setFontSize(7);
+    y += 14;
+
+    // Kop lines 5-6: 10.2pt Arial Regular
+    doc.setFontSize(10.2);
     doc.setFont('helvetica', 'normal');
     doc.text('Jalan Barito No. 1, Bunulrejo, Blimbing, Kota Malang, Jawa Timur', cx, y, { align: 'center' });
-    y += 3;
+    y += 12;
     doc.text('Laman: https://bapasmalang.kemenkumham.go.id  Pos-el: bapasmalang@gmail.com', cx, y, { align: 'center' });
-    y += 4;
+    y += 10;
 
     // Horizontal separator (double line)
-    doc.setLineWidth(0.8);
-    doc.line(margin, y, pw - margin, y);
-    y += 1.2;
-    doc.setLineWidth(0.3);
-    doc.line(margin, y, pw - margin, y);
-    y += 8;
+    doc.setLineWidth(2.2);
+    doc.line(mLeft, y, pw - mRight, y);
+    y += 3;
+    doc.setLineWidth(0.6);
+    doc.line(mLeft, y, pw - mRight, y);
+    y += 22;
 
     // ===== 2. JUDUL — center, bold, underline =====
-    doc.setFontSize(11);
+    doc.setFontSize(10.8);
     doc.setFont('helvetica', 'bold');
     const titleText = 'SURAT PENGAKHIRAN';
     doc.text(titleText, cx, y, { align: 'center' });
     const tw = doc.getTextWidth(titleText);
-    doc.setLineWidth(0.4);
-    doc.line(cx - tw / 2, y + 1, cx + tw / 2, y + 1);
-    y += 6;
+    doc.setLineWidth(0.8);
+    doc.line(cx - tw / 2, y + 2, cx + tw / 2, y + 2);
+    y += 16;
+
+    // Nomor surat — bold
     const nomorSurat = suratPengakhiranForm.nomor_surat || 'WP.15.PAS.15-PK.06.04-........';
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal');
     doc.text(`NOMOR: ${nomorSurat}`, cx, y, { align: 'center' });
-    y += 10;
+    y += 24;
 
     // ===== 3. PEMBUKA — rata kiri =====
-    doc.setFontSize(10);
+    doc.setFontSize(10.8);
     doc.setFont('helvetica', 'normal');
-    doc.text('Kepala Balai Pemasyarakatan (BAPAS) Kelas I Malang, dengan ini menerangkan :', margin, y);
-    y += 8;
+    doc.text('Kepala Balai Pemasyarakatan (BAPAS) Kelas I Malang, dengan ini menerangkan :', mLeft, y);
+    y += 20;
 
     // ===== 4. DATA IDENTITAS — tabel 2 kolom =====
-    const colonX = margin + 50; // ~240pt equivalent
-    const valueX = colonX + 5;
+    const colonX = 240; // fixed colon position ~240pt
+    const valueX = colonX + 12;
 
     const birthDate = profile?.birth_date ? format(new Date(profile.birth_date), 'dd MMMM yyyy') : '-';
     const birthPlace = (profile as any)?.birth_place || '-';
     const tempatTglLahir = `${birthPlace}, ${birthDate}`;
 
-    const items: [string, string][] = [
+    const identityItems: [string, string][] = [
       ['Nama', profile?.full_name || '-'],
       ['Nomor Register', suratPengakhiranClient.case_number || '-'],
       ['Tempat/ Tanggal Lahir', tempatTglLahir],
       ['Alamat', profile?.address || '-'],
     ];
 
-    items.forEach(([label, value]) => {
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(10);
-      doc.text(label, margin + 5, y);
+    doc.setFontSize(10.8);
+    doc.setFont('helvetica', 'normal');
+    const lineH = 15;
+    identityItems.forEach(([label, value]) => {
+      doc.text(label, mLeft + 14, y);
       doc.text(':', colonX, y);
-      const maxW = pw - margin - valueX;
+      const maxW = pw - mRight - valueX;
       const lines = doc.splitTextToSize(value, maxW);
       doc.text(lines, valueX, y);
-      y += lines.length * 5 + 2;
+      y += lines.length * lineH;
     });
-    y += 4;
+    y += 8;
 
-    // ===== 5. PARAGRAF ISI — justify, indent =====
-    doc.setFontSize(10);
-    const indent = 10;
+    // ===== 5. PARAGRAF ISI — justify, indent baris pertama =====
+    const indent = 28; // ~1cm indent
+    doc.setFontSize(10.8);
+    doc.setFont('helvetica', 'normal');
+
     // Paragraph 1: dasar hukum
     const tanggalSk = suratPengakhiranForm.tanggal_sk ? format(new Date(suratPengakhiranForm.tanggal_sk), 'dd MMMM yyyy') : '....................';
     const nomorSk = suratPengakhiranForm.nomor_sk || '..........................';
     const perihalSk = suratPengakhiranForm.perihal_sk;
     const skText = `Sesuai dengan Surat Keputusan Menteri Imigrasi dan Pemasyarakatan Republik Indonesia tanggal ${tanggalSk} Nomor: ${nomorSk}, perihal ${perihalSk}.`;
-    const skLines = doc.splitTextToSize(skText, pw - margin * 2 - indent);
-    // First line indented
+    const skLines = doc.splitTextToSize(skText, contentW - indent);
     if (skLines.length > 0) {
-      doc.text(skLines[0], margin + indent, y);
-      y += 5;
+      doc.text(skLines[0], mLeft + indent, y);
+      y += lineH;
       for (let i = 1; i < skLines.length; i++) {
-        doc.text(skLines[i], margin, y);
-        y += 5;
+        doc.text(skLines[i], mLeft, y);
+        y += lineH;
       }
     }
-    y += 3;
+    y += 4;
 
-    // Paragraph 2: termination reasons
+    // Paragraph 2: tanggal pengakhiran + opsi alasan
     const dayNames: Record<string, string> = {
       Sunday: 'Minggu', Monday: 'Senin', Tuesday: 'Selasa', Wednesday: 'Rabu',
       Thursday: 'Kamis', Friday: 'Jumat', Saturday: 'Sabtu',
@@ -441,39 +451,46 @@ export default function PegawaiDashboard() {
     const endDay = dayNames[endDayEn] || endDayEn;
     const endDateFull = endDateObj ? format(endDateObj, 'dd MMMM yyyy') : '...........';
 
-    const termText = `Pada hari ${endDay} tanggal ${endDateFull} masa bimbingan diakhiri karena telah Selesai masa bimbingan / Melanggar hukum lagi / Pindah alamat tanpa melapor dan tidak ditemukan alamat baru / Meninggal dunia / Pindah bimbingan ke Bapas lain / Melanggar syarat khusus pembimbingan (*coret yang tidak perlu).`;
-    const termLines = doc.splitTextToSize(termText, pw - margin * 2 - indent);
+    // Build the termination paragraph with bold options
+    const termPre = `Pada hari ${endDay} tanggal ${endDateFull} masa bimbingan diakhiri karena telah `;
+    const termOptions = 'Selesai masa bimbingan / Melanggar hukum lagi / Pindah alamat tanpa melapor dan tidak ditemukan alamat baru / Meninggal dunia / Pindah bimbingan ke Bapas lain / Melanggar syarat khusus pembimbingan';
+    const termPost = ' (*coret yang tidak perlu).';
+    const termFull = termPre + termOptions + termPost;
+    const termLines = doc.splitTextToSize(termFull, contentW - indent);
+
     if (termLines.length > 0) {
-      doc.text(termLines[0], margin + indent, y);
-      y += 5;
+      doc.text(termLines[0], mLeft + indent, y);
+      y += lineH;
       for (let i = 1; i < termLines.length; i++) {
-        doc.text(termLines[i], margin, y);
-        y += 5;
+        doc.text(termLines[i], mLeft, y);
+        y += lineH;
       }
     }
-    y += 3;
+    y += 4;
 
-    // ===== 6. PENUTUP =====
+    // ===== 6. PENUTUP — justify =====
     const closingText = 'Demikian surat pengakhiran ini disampaikan. Atas perhatiannya diucapkan terima kasih.';
-    const closingLines = doc.splitTextToSize(closingText, pw - margin * 2 - indent);
+    const closingLines = doc.splitTextToSize(closingText, contentW - indent);
     if (closingLines.length > 0) {
-      doc.text(closingLines[0], margin + indent, y);
-      y += 5;
+      doc.text(closingLines[0], mLeft + indent, y);
+      y += lineH;
       for (let i = 1; i < closingLines.length; i++) {
-        doc.text(closingLines[i], margin, y);
-        y += 5;
+        doc.text(closingLines[i], mLeft, y);
+        y += lineH;
       }
     }
-    y += 8;
+    y += 20;
 
-    // ===== 7. TANDA TANGAN — rata kanan =====
-    const sigX = pw / 2 + 20; // ~130mm from left (~369pt)
+    // ===== 7. TANDA TANGAN — rata kanan (x ≈ 369 pt) =====
+    const sigX = 369;
     const dateSurat = format(new Date(), 'dd MMMM yyyy');
+    doc.setFontSize(10.8);
+    doc.setFont('helvetica', 'normal');
     doc.text(`Malang, ${dateSurat}`, sigX, y);
-    y += 5;
+    y += lineH;
     doc.text('Kepala Bapas Kelas I Malang', sigX, y);
     const sigTopY = y;
-    y += 25; // space for signature
+    y += 60; // space for signature
     doc.setFont('helvetica', 'bold');
     doc.text(suratPengakhiranForm.kepala_nama || '............................', sigX, y);
     doc.setFont('helvetica', 'normal');
@@ -487,7 +504,7 @@ export default function PegawaiDashboard() {
         await new Promise<void>((resolve) => {
           reader.onload = () => {
             const imgData = reader.result as string;
-            doc.addImage(imgData, 'JPEG', margin, sigTopY + 2, 25, 33);
+            doc.addImage(imgData, 'JPEG', mLeft, sigTopY + 5, 70, 90);
             resolve();
           };
           reader.onerror = () => resolve();
@@ -496,14 +513,12 @@ export default function PegawaiDashboard() {
       } catch {}
     }
 
-    y += 10;
-
-    // ===== 9. TEMBUSAN — pojok kiri bawah =====
-    const tembusanY = Math.max(y, ph - 45);
-    doc.setFontSize(9);
+    // ===== 9. TEMBUSAN — pojok kiri bawah (y ≈ 722 pt) =====
+    const tembusanY = 722;
+    doc.setFontSize(10.2);
     doc.setFont('helvetica', 'normal');
-    doc.text('Tembusan :', margin, tembusanY);
-    doc.text('1.  Arsip', margin, tembusanY + 4);
+    doc.text('Tembusan :', mLeft, tembusanY);
+    doc.text('1.  Arsip', mLeft, tembusanY + 13);
 
     const clientName = (profile?.full_name || 'klien').replace(/\s+/g, '_');
     doc.save(`Surat_Pengakhiran_${clientName}_${format(new Date(), 'yyyy-MM-dd')}.pdf`);
