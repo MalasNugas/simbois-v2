@@ -499,14 +499,16 @@ export default function PegawaiDashboard() {
       { text: ' (*coret yang tidak perlu).', strike: false, bold: false, italic: true },
     ];
 
-    // Concatenate full text and split into lines
+    // Concatenate full text and split into justified lines
+    // Use bold font for measurement since bold segments are wider — prevents text cutoff
     const termFull = termSegments.map(s => s.text).join('');
-    // First line uses indent width, rest uses full width
+    doc.setFont('helvetica', 'bold');
     const termFirstLines = doc.splitTextToSize(termFull, contentW - indent);
     const termFirstLine: string = termFirstLines[0] || '';
-    const termRest = termFull.substring(termFirstLine.length).trim();
-    const termRestLines: string[] = termRest ? doc.splitTextToSize(termRest, contentW) : [];
+    const termRestText = termFull.substring(termFirstLine.length);
+    const termRestLines: string[] = termRestText.length > 0 ? doc.splitTextToSize(termRestText.trimStart(), contentW) : [];
     const allTermLines = [termFirstLine, ...termRestLines];
+    doc.setFont('helvetica', 'normal');
 
     // Render line by line with segment-based styling and justified spacing
     let segIdx = 0;
