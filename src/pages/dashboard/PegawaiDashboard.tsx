@@ -425,20 +425,51 @@ export default function PegawaiDashboard() {
     doc.setFontSize(10.8);
     doc.setFont('helvetica', 'normal');
 
+    // Helper: justify a single line by distributing extra space between words
+    const justifyLine = (text: string, x: number, yPos: number, maxW: number) => {
+      const words = text.split(' ');
+      if (words.length <= 1) {
+        doc.text(text, x, yPos);
+        return;
+      }
+      const textW = doc.getTextWidth(text);
+      const extraSpace = (maxW - textW) / (words.length - 1);
+      let curX = x;
+      words.forEach((word, i) => {
+        doc.text(word, curX, yPos);
+        curX += doc.getTextWidth(word) + doc.getTextWidth(' ') + (i < words.length - 1 ? extraSpace : 0);
+      });
+    };
+
+    // Helper: render a full paragraph justified with first-line indent
+    const renderJustifiedParagraph = (text: string, firstLineW: number, restW: number) => {
+      const firstLines = doc.splitTextToSize(text, firstLineW);
+      if (firstLines.length === 0) return;
+      // First line with indent
+      const firstLine: string = firstLines[0];
+      const restText = text.substring(firstLine.length).trim();
+      const allRestLines = restText ? doc.splitTextToSize(restText, restW) : [];
+      const totalLines = [firstLine, ...allRestLines];
+      const isLastIdx = totalLines.length - 1;
+
+      totalLines.forEach((line: string, i: number) => {
+        const lx = i === 0 ? mLeft + indent : mLeft;
+        const lw = i === 0 ? firstLineW : restW;
+        if (i < isLastIdx) {
+          justifyLine(line, lx, y, lw);
+        } else {
+          doc.text(line, lx, y); // last line left-aligned
+        }
+        y += lineH;
+      });
+    };
+
     // Paragraph 1: dasar hukum
     const tanggalSk = suratPengakhiranForm.tanggal_sk ? format(new Date(suratPengakhiranForm.tanggal_sk), 'dd MMMM yyyy') : '....................';
     const nomorSk = suratPengakhiranForm.nomor_sk || '..........................';
     const perihalSk = suratPengakhiranForm.perihal_sk;
     const skText = `Sesuai dengan Surat Keputusan Menteri Imigrasi dan Pemasyarakatan Republik Indonesia tanggal ${tanggalSk} Nomor: ${nomorSk}, perihal ${perihalSk}.`;
-    const skLines = doc.splitTextToSize(skText, contentW - indent);
-    if (skLines.length > 0) {
-      doc.text(skLines[0], mLeft + indent, y);
-      y += lineH;
-      for (let i = 1; i < skLines.length; i++) {
-        doc.text(skLines[i], mLeft, y);
-        y += lineH;
-      }
-    }
+    renderJustifiedParagraph(skText, contentW - indent, contentW);
     y += 4;
 
     // Paragraph 2: tanggal pengakhiran + opsi alasan
@@ -468,20 +499,63 @@ export default function PegawaiDashboard() {
       { text: ' (*coret yang tidak perlu).', strike: false, bold: false },
     ];
 
-    // Concatenate full text to get line-wrapped positions, then render with styles
+    // Concatenate full text and split into lines
     const termFull = termSegments.map(s => s.text).join('');
-    const termLines = doc.splitTextToSize(termFull, contentW - indent);
+    // First line uses indent width, rest uses full width
+    const termFirstLines = doc.splitTextToSize(termFull, contentW - indent);
+    const termFirstLine: string = termFirstLines[0] || '';
+    const termRest = termFull.substring(termFirstLine.length).trim();
+    const termRestLines: string[] = termRest ? doc.splitTextToSize(termRest, contentW) : [];
+    const allTermLines = [termFirstLine, ...termRestLines];
 
-    // Render line by line, tracking segments for strikethrough
+    // Render line by line with segment-based styling and justified spacing
     let segIdx = 0;
     let segCharOffset = 0;
 
-    for (let li = 0; li < termLines.length; li++) {
-      const lineText: string = termLines[li];
-      const lineX = li === 0 ? mLeft + indent : mLeft;
+    for (let li = 0; li < allTermLines.length; li++) {
+      const lineText: string = allTermLines[li];
+      const isFirstLine = li === 0;
+      const isLastLine = li === allTermLines.length - 1;
+      const lineX = isFirstLine ? mLeft + indent : mLeft;
+      const lineMaxW = isFirstLine ? contentW - indent : contentW;
+
+      // Calculate total text width for this line to determine justify spacing
+      let totalLineTextW = 0;
+      const lineWords: { text: string; strike: boolean; bold: boolean }[] = [];
+
+      // Split line into word-level chunks with style info
+      let tempSegIdx = segIdx;
+      let tempSegCharOffset = segCharOffset;
+      let tempRemaining = lineText.length;
+      let tempLineCharPos = 0;
+      let currentWord = '';
+      let currentStrike = false;
+      let currentBold = false;
+      const styledChunks: { text: string; strike: boolean; bold: boolean }[] = [];
+
+      while (tempRemaining > 0 && tempSegIdx < termSegments.length) {
+        const seg = termSegments[tempSegIdx];
+        const segRemaining = seg.text.length - tempSegCharOffset;
+        const charsToRead = Math.min(tempRemaining, segRemaining);
+        const chunk = seg.text.substring(tempSegCharOffset, tempSegCharOffset + charsToRead);
+        styledChunks.push({ text: chunk, strike: seg.strike, bold: seg.bold });
+        tempRemaining -= charsToRead;
+        tempSegCharOffset += charsToRead;
+        if (tempSegCharOffset >= seg.text.length) {
+          tempSegIdx++;
+          tempSegCharOffset = 0;
+        }
+      }
+
+      // For justify: compute total text width and space count
+      doc.setFont('helvetica', 'normal');
+      const plainLineW = doc.getTextWidth(lineText);
+      const spaceCount = (lineText.match(/ /g) || []).length;
+      const extraPerSpace = (!isLastLine && spaceCount > 0) ? (lineMaxW - plainLineW) / spaceCount : 0;
+
+      // Render chunks character by character with proper spacing
       let curX = lineX;
       let remaining = lineText.length;
-      let lineCharPos = 0;
 
       while (remaining > 0 && segIdx < termSegments.length) {
         const seg = termSegments[segIdx];
@@ -490,18 +564,36 @@ export default function PegawaiDashboard() {
         const chunk = seg.text.substring(segCharOffset, segCharOffset + charsToRender);
 
         doc.setFont('helvetica', seg.bold ? 'bold' : 'normal');
-        doc.text(chunk, curX, y);
 
-        const chunkW = doc.getTextWidth(chunk);
-
-        if (seg.strike) {
-          const strikeY = y - 3.5;
-          doc.setLineWidth(0.5);
-          doc.line(curX, strikeY, curX + chunkW, strikeY);
+        if (extraPerSpace > 0) {
+          // Render word by word with extra spacing
+          const parts = chunk.split(' ');
+          parts.forEach((part, pi) => {
+            if (pi > 0) {
+              curX += doc.getTextWidth(' ') + extraPerSpace;
+            }
+            if (part) {
+              doc.text(part, curX, y);
+              const partW = doc.getTextWidth(part);
+              if (seg.strike) {
+                const strikeY = y - 3.5;
+                doc.setLineWidth(0.5);
+                doc.line(curX, strikeY, curX + partW, strikeY);
+              }
+              curX += partW;
+            }
+          });
+        } else {
+          doc.text(chunk, curX, y);
+          const chunkW = doc.getTextWidth(chunk);
+          if (seg.strike) {
+            const strikeY = y - 3.5;
+            doc.setLineWidth(0.5);
+            doc.line(curX, strikeY, curX + chunkW, strikeY);
+          }
+          curX += chunkW;
         }
 
-        curX += chunkW;
-        lineCharPos += charsToRender;
         remaining -= charsToRender;
         segCharOffset += charsToRender;
 
@@ -517,15 +609,7 @@ export default function PegawaiDashboard() {
 
     // ===== 6. PENUTUP — justify =====
     const closingText = 'Demikian surat pengakhiran ini disampaikan. Atas perhatiannya diucapkan terima kasih.';
-    const closingLines = doc.splitTextToSize(closingText, contentW - indent);
-    if (closingLines.length > 0) {
-      doc.text(closingLines[0], mLeft + indent, y);
-      y += lineH;
-      for (let i = 1; i < closingLines.length; i++) {
-        doc.text(closingLines[i], mLeft, y);
-        y += lineH;
-      }
-    }
+    renderJustifiedParagraph(closingText, contentW - indent, contentW);
     y += 20;
 
     // ===== 7. TANDA TANGAN — rata kanan (x ≈ 369 pt) =====
