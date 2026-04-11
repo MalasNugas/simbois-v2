@@ -496,7 +496,7 @@ export default function PegawaiDashboard() {
       { text: 'Pindah bimbingan ke Bapas lain', strike: true, bold: true },
       { text: ' / ', strike: false, bold: false },
       { text: 'Melanggar syarat khusus pembimbingan', strike: true, bold: true },
-      { text: ' (*coret yang tidak perlu).', strike: false, bold: false },
+      { text: ' (*coret yang tidak perlu).', strike: false, bold: false, italic: true },
     ];
 
     // Concatenate full text and split into lines
