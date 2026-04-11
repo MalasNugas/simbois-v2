@@ -496,22 +496,39 @@ export default function PegawaiDashboard() {
       { text: 'Pindah bimbingan ke Bapas lain', strike: true, bold: true },
       { text: ' / ', strike: false, bold: false },
       { text: 'Melanggar syarat khusus pembimbingan', strike: true, bold: true },
-      { text: ' (*coret yang tidak perlu).', strike: false, bold: false },
+      { text: ' (*coret yang tidak perlu).', strike: false, bold: false, italic: true },
     ];
 
-    // Concatenate full text and split into lines
+    // Concatenate full text and split into justified lines
+    // Use bold font for measurement since bold segments are wider — prevents text cutoff
     const termFull = termSegments.map(s => s.text).join('');
-    // First line uses indent width, rest uses full width
-    const termFirstLines = doc.splitTextToSize(termFull, contentW - indent);
-    const termFirstLine: string = termFirstLines[0] || '';
-    const termRest = termFull.substring(termFirstLine.length).trim();
-    const termRestLines: string[] = termRest ? doc.splitTextToSize(termRest, contentW) : [];
-    const allTermLines = [termFirstLine, ...termRestLines];
+    doc.setFont('helvetica', 'bold');
+    const allTermLines: string[] = [];
+    let splitRemaining = termFull;
+    let isFirst = true;
+    while (splitRemaining.length > 0) {
+      const w = isFirst ? contentW - indent : contentW;
+      const lines = doc.splitTextToSize(splitRemaining, w);
+      const line: string = lines[0] || '';
+      allTermLines.push(line);
+      splitRemaining = splitRemaining.substring(line.length);
+      // Skip leading spaces for next line (they get trimmed visually)
+      if (splitRemaining.startsWith(' ')) splitRemaining = splitRemaining.substring(1);
+      isFirst = false;
+    }
+    doc.setFont('helvetica', 'normal');
+
+    // Build a mapping from allTermLines back to termFull positions for segment tracking
+    const lineStartOffsets: number[] = [];
+    let offsetInFull = 0;
+    for (const line of allTermLines) {
+      lineStartOffsets.push(offsetInFull);
+      offsetInFull += line.length;
+      // account for skipped space
+      if (offsetInFull < termFull.length && termFull[offsetInFull] === ' ') offsetInFull++;
+    }
 
     // Render line by line with segment-based styling and justified spacing
-    let segIdx = 0;
-    let segCharOffset = 0;
-
     for (let li = 0; li < allTermLines.length; li++) {
       const lineText: string = allTermLines[li];
       const isFirstLine = li === 0;
@@ -519,55 +536,47 @@ export default function PegawaiDashboard() {
       const lineX = isFirstLine ? mLeft + indent : mLeft;
       const lineMaxW = isFirstLine ? contentW - indent : contentW;
 
-      // Calculate total text width for this line to determine justify spacing
-      let totalLineTextW = 0;
-      const lineWords: { text: string; strike: boolean; bold: boolean }[] = [];
+      // Find which segments correspond to this line based on offset in termFull
+      const lineOffset = lineStartOffsets[li];
+      const lineLen = lineText.length;
 
-      // Split line into word-level chunks with style info
-      let tempSegIdx = segIdx;
-      let tempSegCharOffset = segCharOffset;
-      let tempRemaining = lineText.length;
-      let tempLineCharPos = 0;
-      let currentWord = '';
-      let currentStrike = false;
-      let currentBold = false;
+      // Build styled chunks for this line from segments
       const styledChunks: { text: string; strike: boolean; bold: boolean }[] = [];
+      let charPos = 0; // position within termFull
+      let segStart = 0;
+      // find cumulative segment starts
+      const segStarts: number[] = [];
+      let cum = 0;
+      for (const seg of termSegments) { segStarts.push(cum); cum += seg.text.length; }
 
-      while (tempRemaining > 0 && tempSegIdx < termSegments.length) {
-        const seg = termSegments[tempSegIdx];
-        const segRemaining = seg.text.length - tempSegCharOffset;
-        const charsToRead = Math.min(tempRemaining, segRemaining);
-        const chunk = seg.text.substring(tempSegCharOffset, tempSegCharOffset + charsToRead);
-        styledChunks.push({ text: chunk, strike: seg.strike, bold: seg.bold });
-        tempRemaining -= charsToRead;
-        tempSegCharOffset += charsToRead;
-        if (tempSegCharOffset >= seg.text.length) {
-          tempSegIdx++;
-          tempSegCharOffset = 0;
-        }
+      // Map lineOffset..(lineOffset+lineLen) to segments
+      let fullPos = lineOffset;
+      let lineRemaining = lineLen;
+      for (let si = 0; si < termSegments.length && lineRemaining > 0; si++) {
+        const segEnd = segStarts[si] + termSegments[si].text.length;
+        if (fullPos >= segEnd) continue; // skip segments before this line
+        const startInSeg = fullPos - segStarts[si];
+        const availInSeg = termSegments[si].text.length - startInSeg;
+        const take = Math.min(lineRemaining, availInSeg);
+        const chunk = termSegments[si].text.substring(startInSeg, startInSeg + take);
+        styledChunks.push({ text: chunk, strike: termSegments[si].strike, bold: termSegments[si].bold });
+        fullPos += take;
+        lineRemaining -= take;
       }
 
-      // For justify: compute total text width and space count
+      // For justify: compute extra space per word gap
       doc.setFont('helvetica', 'normal');
       const plainLineW = doc.getTextWidth(lineText);
       const spaceCount = (lineText.match(/ /g) || []).length;
       const extraPerSpace = (!isLastLine && spaceCount > 0) ? (lineMaxW - plainLineW) / spaceCount : 0;
 
-      // Render chunks character by character with proper spacing
+      // Render styled chunks
       let curX = lineX;
-      let remaining = lineText.length;
-
-      while (remaining > 0 && segIdx < termSegments.length) {
-        const seg = termSegments[segIdx];
-        const segRemaining = seg.text.length - segCharOffset;
-        const charsToRender = Math.min(remaining, segRemaining);
-        const chunk = seg.text.substring(segCharOffset, segCharOffset + charsToRender);
-
-        doc.setFont('helvetica', seg.bold ? 'bold' : 'normal');
+      for (const chunk of styledChunks) {
+        doc.setFont('helvetica', chunk.bold ? 'bold' : 'normal');
 
         if (extraPerSpace > 0) {
-          // Render word by word with extra spacing
-          const parts = chunk.split(' ');
+          const parts = chunk.text.split(' ');
           parts.forEach((part, pi) => {
             if (pi > 0) {
               curX += doc.getTextWidth(' ') + extraPerSpace;
@@ -575,31 +584,21 @@ export default function PegawaiDashboard() {
             if (part) {
               doc.text(part, curX, y);
               const partW = doc.getTextWidth(part);
-              if (seg.strike) {
-                const strikeY = y - 3.5;
+              if (chunk.strike) {
                 doc.setLineWidth(0.5);
-                doc.line(curX, strikeY, curX + partW, strikeY);
+                doc.line(curX, y - 3.5, curX + partW, y - 3.5);
               }
               curX += partW;
             }
           });
         } else {
-          doc.text(chunk, curX, y);
-          const chunkW = doc.getTextWidth(chunk);
-          if (seg.strike) {
-            const strikeY = y - 3.5;
+          doc.text(chunk.text, curX, y);
+          const chunkW = doc.getTextWidth(chunk.text);
+          if (chunk.strike) {
             doc.setLineWidth(0.5);
-            doc.line(curX, strikeY, curX + chunkW, strikeY);
+            doc.line(curX, y - 3.5, curX + chunkW, y - 3.5);
           }
           curX += chunkW;
-        }
-
-        remaining -= charsToRender;
-        segCharOffset += charsToRender;
-
-        if (segCharOffset >= seg.text.length) {
-          segIdx++;
-          segCharOffset = 0;
         }
       }
       y += lineH;
