@@ -451,21 +451,68 @@ export default function PegawaiDashboard() {
     const endDay = dayNames[endDayEn] || endDayEn;
     const endDateFull = endDateObj ? format(endDateObj, 'dd MMMM yyyy') : '...........';
 
-    // Build the termination paragraph with bold options
-    const termPre = `Pada hari ${endDay} tanggal ${endDateFull} masa bimbingan diakhiri karena telah `;
-    const termOptions = 'Selesai masa bimbingan / Melanggar hukum lagi / Pindah alamat tanpa melapor dan tidak ditemukan alamat baru / Meninggal dunia / Pindah bimbingan ke Bapas lain / Melanggar syarat khusus pembimbingan';
-    const termPost = ' (*coret yang tidak perlu).';
-    const termFull = termPre + termOptions + termPost;
+    // Build the termination paragraph with strikethrough on non-selected options
+    const termSegments = [
+      { text: `Pada hari ${endDay} tanggal ${endDateFull} masa bimbingan diakhiri karena telah `, strike: false, bold: false },
+      { text: 'Selesai masa bimbingan', strike: false, bold: true },
+      { text: ' / ', strike: false, bold: false },
+      { text: 'Melanggar hukum lagi', strike: true, bold: true },
+      { text: ' / ', strike: false, bold: false },
+      { text: 'Pindah alamat tanpa melapor dan tidak ditemukan alamat baru', strike: true, bold: true },
+      { text: ' / ', strike: false, bold: false },
+      { text: 'Meninggal dunia', strike: true, bold: true },
+      { text: ' / ', strike: false, bold: false },
+      { text: 'Pindah bimbingan ke Bapas lain', strike: true, bold: true },
+      { text: ' / ', strike: false, bold: false },
+      { text: 'Melanggar syarat khusus pembimbingan', strike: true, bold: true },
+      { text: ' (*coret yang tidak perlu).', strike: false, bold: false },
+    ];
+
+    // Concatenate full text to get line-wrapped positions, then render with styles
+    const termFull = termSegments.map(s => s.text).join('');
     const termLines = doc.splitTextToSize(termFull, contentW - indent);
 
-    if (termLines.length > 0) {
-      doc.text(termLines[0], mLeft + indent, y);
-      y += lineH;
-      for (let i = 1; i < termLines.length; i++) {
-        doc.text(termLines[i], mLeft, y);
-        y += lineH;
+    // Render line by line, tracking segments for strikethrough
+    let segIdx = 0;
+    let segCharOffset = 0;
+
+    for (let li = 0; li < termLines.length; li++) {
+      const lineText: string = termLines[li];
+      const lineX = li === 0 ? mLeft + indent : mLeft;
+      let curX = lineX;
+      let remaining = lineText.length;
+      let lineCharPos = 0;
+
+      while (remaining > 0 && segIdx < termSegments.length) {
+        const seg = termSegments[segIdx];
+        const segRemaining = seg.text.length - segCharOffset;
+        const charsToRender = Math.min(remaining, segRemaining);
+        const chunk = seg.text.substring(segCharOffset, segCharOffset + charsToRender);
+
+        doc.setFont('helvetica', seg.bold ? 'bold' : 'normal');
+        doc.text(chunk, curX, y);
+
+        const chunkW = doc.getTextWidth(chunk);
+
+        if (seg.strike) {
+          const strikeY = y - 3.5;
+          doc.setLineWidth(0.5);
+          doc.line(curX, strikeY, curX + chunkW, strikeY);
+        }
+
+        curX += chunkW;
+        lineCharPos += charsToRender;
+        remaining -= charsToRender;
+        segCharOffset += charsToRender;
+
+        if (segCharOffset >= seg.text.length) {
+          segIdx++;
+          segCharOffset = 0;
+        }
       }
+      y += lineH;
     }
+    doc.setFont('helvetica', 'normal');
     y += 4;
 
     // ===== 6. PENUTUP — justify =====
