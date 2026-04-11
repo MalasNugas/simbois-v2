@@ -503,12 +503,30 @@ export default function PegawaiDashboard() {
     // Use bold font for measurement since bold segments are wider — prevents text cutoff
     const termFull = termSegments.map(s => s.text).join('');
     doc.setFont('helvetica', 'bold');
-    const termFirstLines = doc.splitTextToSize(termFull, contentW - indent);
-    const termFirstLine: string = termFirstLines[0] || '';
-    const termRestText = termFull.substring(termFirstLine.length);
-    const termRestLines: string[] = termRestText.length > 0 ? doc.splitTextToSize(termRestText.trimStart(), contentW) : [];
-    const allTermLines = [termFirstLine, ...termRestLines];
+    const allTermLines: string[] = [];
+    let splitRemaining = termFull;
+    let isFirst = true;
+    while (splitRemaining.length > 0) {
+      const w = isFirst ? contentW - indent : contentW;
+      const lines = doc.splitTextToSize(splitRemaining, w);
+      const line: string = lines[0] || '';
+      allTermLines.push(line);
+      splitRemaining = splitRemaining.substring(line.length);
+      // Skip leading spaces for next line (they get trimmed visually)
+      if (splitRemaining.startsWith(' ')) splitRemaining = splitRemaining.substring(1);
+      isFirst = false;
+    }
     doc.setFont('helvetica', 'normal');
+
+    // Build a mapping from allTermLines back to termFull positions for segment tracking
+    const lineStartOffsets: number[] = [];
+    let offsetInFull = 0;
+    for (const line of allTermLines) {
+      lineStartOffsets.push(offsetInFull);
+      offsetInFull += line.length;
+      // account for skipped space
+      if (offsetInFull < termFull.length && termFull[offsetInFull] === ' ') offsetInFull++;
+    }
 
     // Render line by line with segment-based styling and justified spacing
     let segIdx = 0;
