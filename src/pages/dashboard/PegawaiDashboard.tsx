@@ -537,7 +537,23 @@ export default function PegawaiDashboard() {
             spacing: { after: 0 },
             children: [new TextRun({ text: 'Kepala Bapas Kelas I Malang', font: 'Arial', size: 21.6 })],
           }),
-          // Space for signature
+          // Space for signature + client photo
+          ...(photoBuffer ? [new Paragraph({
+            spacing: { after: 0 },
+            children: [
+              new ImageRun({
+                type: 'png',
+                data: photoBuffer,
+                transformation: { width: 90, height: 120 },
+                floating: {
+                  horizontalPosition: { offset: 457200 }, // ~left margin
+                  verticalPosition: { relative: 'paragraph' as any, offset: 0 },
+                  behindDocument: false,
+                },
+                altText: { title: 'Foto Klien', description: 'Foto identitas klien', name: 'foto_klien' },
+              }),
+            ],
+          })] : []),
           new Paragraph({ spacing: { after: 0 }, children: [new TextRun({ text: '', size: 21.6 })] }),
           new Paragraph({ spacing: { after: 0 }, children: [new TextRun({ text: '', size: 21.6 })] }),
           new Paragraph({ spacing: { after: 0 }, children: [new TextRun({ text: '', size: 21.6 })] }),
