@@ -310,171 +310,18 @@ export default function PegawaiDashboard() {
     setSuratPengakhiranDialogOpen(true);
   };
 
-  const generateSuratPengakhiranPdf = async () => {
+  const generateSuratPengakhiranDocx = async () => {
     if (!suratPengakhiranClient) return;
     const profile = (suratPengakhiranClient as any).profile;
-    const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
-    const pw = doc.internal.pageSize.getWidth();   // 595 pt
-    const ph = doc.internal.pageSize.getHeight();   // 842 pt
-    const mLeft = 72;   // ~2.54 cm
-    const mRight = 65;  // ~2.29 cm
-    const contentW = pw - mLeft - mRight;
-    let y = 85; // ~3 cm from top
 
-    // Helper: pt to mm for addImage
-    const ptToMm = (v: number) => v * 0.3528;
-
-    // ===== 1. KOP SURAT — rata tengah =====
-    // Logo on left
-    try {
-      const img = new Image();
-      img.crossOrigin = 'anonymous';
-      await new Promise<void>((resolve) => {
-        img.onload = () => resolve();
-        img.onerror = () => resolve();
-        img.src = logoImipas;
-      });
-      if (img.complete && img.naturalWidth > 0) {
-        // Logo ~50pt wide, positioned at mLeft
-        doc.addImage(img, 'PNG', mLeft, y - 8, 50, 50);
-      }
-    } catch {}
-
-    const cx = pw / 2;
-    // Kop lines 1-3: 10.2pt Arial Regular (helvetica), all caps
-    doc.setFontSize(10.2);
-    doc.setFont('helvetica', 'normal');
-    doc.text('KEMENTERIAN IMIGRASI DAN PEMASYARAKATAN', cx, y, { align: 'center' });
-    y += 13;
-    doc.text('DIREKTORAT JENDERAL PEMASYARAKATAN', cx, y, { align: 'center' });
-    y += 13;
-    doc.text('KANTOR WILAYAH JAWA TIMUR', cx, y, { align: 'center' });
-    y += 15;
-
-    // Kop line 4: 10.8pt Arial Bold
-    doc.setFontSize(10.8);
-    doc.setFont('helvetica', 'bold');
-    doc.text('BALAI PEMASYARAKATAN KELAS I MALANG', cx, y, { align: 'center' });
-    y += 14;
-
-    // Kop lines 5-6: 10.2pt Arial Regular
-    doc.setFontSize(10.2);
-    doc.setFont('helvetica', 'normal');
-    doc.text('Jalan Barito No. 1, Bunulrejo, Blimbing, Kota Malang, Jawa Timur', cx, y, { align: 'center' });
-    y += 12;
-    doc.text('Laman: https://bapasmalang.kemenkumham.go.id  Pos-el: bapasmalang@gmail.com', cx, y, { align: 'center' });
-    y += 10;
-
-    // Horizontal separator (double line)
-    doc.setLineWidth(2.2);
-    doc.line(mLeft, y, pw - mRight, y);
-    y += 3;
-    doc.setLineWidth(0.6);
-    doc.line(mLeft, y, pw - mRight, y);
-    y += 22;
-
-    // ===== 2. JUDUL — center, bold, underline =====
-    doc.setFontSize(10.8);
-    doc.setFont('helvetica', 'bold');
-    const titleText = 'SURAT PENGAKHIRAN';
-    doc.text(titleText, cx, y, { align: 'center' });
-    const tw = doc.getTextWidth(titleText);
-    doc.setLineWidth(0.8);
-    doc.line(cx - tw / 2, y + 2, cx + tw / 2, y + 2);
-    y += 16;
-
-    // Nomor surat — bold
-    const nomorSurat = suratPengakhiranForm.nomor_surat || 'WP.15.PAS.15-PK.06.04-........';
-    doc.text(`NOMOR: ${nomorSurat}`, cx, y, { align: 'center' });
-    y += 24;
-
-    // ===== 3. PEMBUKA — rata kiri =====
-    doc.setFontSize(10.8);
-    doc.setFont('helvetica', 'normal');
-    doc.text('Kepala Balai Pemasyarakatan (BAPAS) Kelas I Malang, dengan ini menerangkan :', mLeft, y);
-    y += 20;
-
-    // ===== 4. DATA IDENTITAS — tabel 2 kolom =====
-    const colonX = 240; // fixed colon position ~240pt
-    const valueX = colonX + 12;
-
+    // Prepare data
     const birthDate = profile?.birth_date ? format(new Date(profile.birth_date), 'dd MMMM yyyy') : '-';
     const birthPlace = (profile as any)?.birth_place || '-';
     const tempatTglLahir = `${birthPlace}, ${birthDate}`;
-
-    const identityItems: [string, string][] = [
-      ['Nama', profile?.full_name || '-'],
-      ['Nomor Register', suratPengakhiranClient.case_number || '-'],
-      ['Tempat/ Tanggal Lahir', tempatTglLahir],
-      ['Alamat', profile?.address || '-'],
-    ];
-
-    doc.setFontSize(10.8);
-    doc.setFont('helvetica', 'normal');
-    const lineH = 15;
-    identityItems.forEach(([label, value]) => {
-      doc.text(label, mLeft + 14, y);
-      doc.text(':', colonX, y);
-      const maxW = pw - mRight - valueX;
-      const lines = doc.splitTextToSize(value, maxW);
-      doc.text(lines, valueX, y);
-      y += lines.length * lineH;
-    });
-    y += 8;
-
-    // ===== 5. PARAGRAF ISI — justify, indent baris pertama =====
-    const indent = 28; // ~1cm indent
-    doc.setFontSize(10.8);
-    doc.setFont('helvetica', 'normal');
-
-    // Helper: justify a single line by distributing extra space between words
-    const justifyLine = (text: string, x: number, yPos: number, maxW: number) => {
-      const words = text.split(' ');
-      if (words.length <= 1) {
-        doc.text(text, x, yPos);
-        return;
-      }
-      const textW = doc.getTextWidth(text);
-      const extraSpace = (maxW - textW) / (words.length - 1);
-      let curX = x;
-      words.forEach((word, i) => {
-        doc.text(word, curX, yPos);
-        curX += doc.getTextWidth(word) + doc.getTextWidth(' ') + (i < words.length - 1 ? extraSpace : 0);
-      });
-    };
-
-    // Helper: render a full paragraph justified with first-line indent
-    const renderJustifiedParagraph = (text: string, firstLineW: number, restW: number) => {
-      const firstLines = doc.splitTextToSize(text, firstLineW);
-      if (firstLines.length === 0) return;
-      // First line with indent
-      const firstLine: string = firstLines[0];
-      const restText = text.substring(firstLine.length).trim();
-      const allRestLines = restText ? doc.splitTextToSize(restText, restW) : [];
-      const totalLines = [firstLine, ...allRestLines];
-      const isLastIdx = totalLines.length - 1;
-
-      totalLines.forEach((line: string, i: number) => {
-        const lx = i === 0 ? mLeft + indent : mLeft;
-        const lw = i === 0 ? firstLineW : restW;
-        if (i < isLastIdx) {
-          justifyLine(line, lx, y, lw);
-        } else {
-          doc.text(line, lx, y); // last line left-aligned
-        }
-        y += lineH;
-      });
-    };
-
-    // Paragraph 1: dasar hukum
     const tanggalSk = suratPengakhiranForm.tanggal_sk ? format(new Date(suratPengakhiranForm.tanggal_sk), 'dd MMMM yyyy') : '....................';
     const nomorSk = suratPengakhiranForm.nomor_sk || '..........................';
     const perihalSk = suratPengakhiranForm.perihal_sk;
-    const skText = `Sesuai dengan Surat Keputusan Menteri Imigrasi dan Pemasyarakatan Republik Indonesia tanggal ${tanggalSk} Nomor: ${nomorSk}, perihal ${perihalSk}.`;
-    renderJustifiedParagraph(skText, contentW - indent, contentW);
-    y += 4;
-
-    // Paragraph 2: tanggal pengakhiran + opsi alasan
+    const nomorSurat = suratPengakhiranForm.nomor_surat || 'WP.15.PAS.15-PK.06.04-........';
     const dayNames: Record<string, string> = {
       Sunday: 'Minggu', Monday: 'Senin', Tuesday: 'Selasa', Wednesday: 'Rabu',
       Thursday: 'Kamis', Friday: 'Jumat', Saturday: 'Sabtu',
@@ -483,178 +330,240 @@ export default function PegawaiDashboard() {
     const endDayEn = endDateObj ? format(endDateObj, 'EEEE') : '...........';
     const endDay = dayNames[endDayEn] || endDayEn;
     const endDateFull = endDateObj ? format(endDateObj, 'dd MMMM yyyy') : '...........';
-
-    // Build the termination paragraph with strikethrough on non-selected options
-    const termSegments = [
-      { text: `Pada hari ${endDay} tanggal ${endDateFull} masa bimbingan diakhiri karena telah `, strike: false, bold: false },
-      { text: 'Selesai masa bimbingan', strike: false, bold: true },
-      { text: ' / ', strike: false, bold: false },
-      { text: 'Melanggar hukum lagi', strike: true, bold: true },
-      { text: ' / ', strike: false, bold: false },
-      { text: 'Pindah alamat tanpa melapor dan tidak ditemukan alamat baru', strike: true, bold: true },
-      { text: ' / ', strike: false, bold: false },
-      { text: 'Meninggal dunia', strike: true, bold: true },
-      { text: ' / ', strike: false, bold: false },
-      { text: 'Pindah bimbingan ke Bapas lain', strike: true, bold: true },
-      { text: ' / ', strike: false, bold: false },
-      { text: 'Melanggar syarat khusus pembimbingan', strike: true, bold: true },
-      { text: ' (*coret yang tidak perlu).', strike: false, bold: false, italic: true },
-    ];
-
-    // Concatenate full text and split into justified lines
-    // Use bold font for measurement since bold segments are wider — prevents text cutoff
-    const termFull = termSegments.map(s => s.text).join('');
-    doc.setFont('helvetica', 'bold');
-    const allTermLines: string[] = [];
-    let splitRemaining = termFull;
-    let isFirst = true;
-    while (splitRemaining.length > 0) {
-      const w = isFirst ? contentW - indent : contentW;
-      const lines = doc.splitTextToSize(splitRemaining, w);
-      const line: string = lines[0] || '';
-      allTermLines.push(line);
-      splitRemaining = splitRemaining.substring(line.length);
-      // Skip leading spaces for next line (they get trimmed visually)
-      if (splitRemaining.startsWith(' ')) splitRemaining = splitRemaining.substring(1);
-      isFirst = false;
-    }
-    doc.setFont('helvetica', 'normal');
-
-    // Build a mapping from allTermLines back to termFull positions for segment tracking
-    const lineStartOffsets: number[] = [];
-    let offsetInFull = 0;
-    for (const line of allTermLines) {
-      lineStartOffsets.push(offsetInFull);
-      offsetInFull += line.length;
-      // account for skipped space
-      if (offsetInFull < termFull.length && termFull[offsetInFull] === ' ') offsetInFull++;
-    }
-
-    // Render line by line with segment-based styling and justified spacing
-    for (let li = 0; li < allTermLines.length; li++) {
-      const lineText: string = allTermLines[li];
-      const isFirstLine = li === 0;
-      const isLastLine = li === allTermLines.length - 1;
-      const lineX = isFirstLine ? mLeft + indent : mLeft;
-      const lineMaxW = isFirstLine ? contentW - indent : contentW;
-
-      // Find which segments correspond to this line based on offset in termFull
-      const lineOffset = lineStartOffsets[li];
-      const lineLen = lineText.length;
-
-      // Build styled chunks for this line from segments
-      const styledChunks: { text: string; strike: boolean; bold: boolean }[] = [];
-      let charPos = 0; // position within termFull
-      let segStart = 0;
-      // find cumulative segment starts
-      const segStarts: number[] = [];
-      let cum = 0;
-      for (const seg of termSegments) { segStarts.push(cum); cum += seg.text.length; }
-
-      // Map lineOffset..(lineOffset+lineLen) to segments
-      let fullPos = lineOffset;
-      let lineRemaining = lineLen;
-      for (let si = 0; si < termSegments.length && lineRemaining > 0; si++) {
-        const segEnd = segStarts[si] + termSegments[si].text.length;
-        if (fullPos >= segEnd) continue; // skip segments before this line
-        const startInSeg = fullPos - segStarts[si];
-        const availInSeg = termSegments[si].text.length - startInSeg;
-        const take = Math.min(lineRemaining, availInSeg);
-        const chunk = termSegments[si].text.substring(startInSeg, startInSeg + take);
-        styledChunks.push({ text: chunk, strike: termSegments[si].strike, bold: termSegments[si].bold });
-        fullPos += take;
-        lineRemaining -= take;
-      }
-
-      // For justify: compute extra space per word gap
-      doc.setFont('helvetica', 'normal');
-      const plainLineW = doc.getTextWidth(lineText);
-      const spaceCount = (lineText.match(/ /g) || []).length;
-      const extraPerSpace = (!isLastLine && spaceCount > 0) ? (lineMaxW - plainLineW) / spaceCount : 0;
-
-      // Render styled chunks
-      let curX = lineX;
-      for (const chunk of styledChunks) {
-        doc.setFont('helvetica', chunk.bold ? 'bold' : 'normal');
-
-        if (extraPerSpace > 0) {
-          const parts = chunk.text.split(' ');
-          parts.forEach((part, pi) => {
-            if (pi > 0) {
-              curX += doc.getTextWidth(' ') + extraPerSpace;
-            }
-            if (part) {
-              doc.text(part, curX, y);
-              const partW = doc.getTextWidth(part);
-              if (chunk.strike) {
-                doc.setLineWidth(0.5);
-                doc.line(curX, y - 3.5, curX + partW, y - 3.5);
-              }
-              curX += partW;
-            }
-          });
-        } else {
-          doc.text(chunk.text, curX, y);
-          const chunkW = doc.getTextWidth(chunk.text);
-          if (chunk.strike) {
-            doc.setLineWidth(0.5);
-            doc.line(curX, y - 3.5, curX + chunkW, y - 3.5);
-          }
-          curX += chunkW;
-        }
-      }
-      y += lineH;
-    }
-    doc.setFont('helvetica', 'normal');
-    y += 4;
-
-    // ===== 6. PENUTUP — justify =====
-    const closingText = 'Demikian surat pengakhiran ini disampaikan. Atas perhatiannya diucapkan terima kasih.';
-    renderJustifiedParagraph(closingText, contentW - indent, contentW);
-    y += 20;
-
-    // ===== 7. TANDA TANGAN — rata kanan (x ≈ 369 pt) =====
-    const sigX = 369;
     const dateSurat = format(new Date(), 'dd MMMM yyyy');
-    doc.setFontSize(10.8);
-    doc.setFont('helvetica', 'normal');
-    doc.text(`Malang, ${dateSurat}`, sigX, y);
-    y += lineH;
-    doc.text('Kepala Bapas Kelas I Malang', sigX, y);
-    const sigTopY = y;
-    y += 60; // space for signature
-    doc.setFont('helvetica', 'bold');
-    doc.text(suratPengakhiranForm.kepala_nama || '............................', sigX, y);
-    doc.setFont('helvetica', 'normal');
 
-    // ===== 8. FOTO — kiri bawah area tanda tangan =====
+    // Load logo
+    let logoBuffer: ArrayBuffer | null = null;
+    try {
+      const resp = await fetch(logoImipas);
+      logoBuffer = await resp.arrayBuffer();
+    } catch {}
+
+    // Load client photo
+    let photoBuffer: ArrayBuffer | null = null;
     if (profile?.avatar_url) {
       try {
-        const imgResp = await fetch(profile.avatar_url);
-        const blob = await imgResp.blob();
-        const reader = new FileReader();
-        await new Promise<void>((resolve) => {
-          reader.onload = () => {
-            const imgData = reader.result as string;
-            doc.addImage(imgData, 'JPEG', mLeft, sigTopY + 5, 70, 90);
-            resolve();
-          };
-          reader.onerror = () => resolve();
-          reader.readAsDataURL(blob);
-        });
+        const resp = await fetch(profile.avatar_url);
+        photoBuffer = await resp.arrayBuffer();
       } catch {}
     }
 
-    // ===== 9. TEMBUSAN — pojok kiri bawah (y ≈ 722 pt) =====
-    const tembusanY = 722;
-    doc.setFontSize(10.2);
-    doc.setFont('helvetica', 'normal');
-    doc.text('Tembusan :', mLeft, tembusanY);
-    doc.text('1.  Arsip', mLeft, tembusanY + 13);
+    // Termination reason options
+    const alasanOptions = [
+      'Selesai masa bimbingan',
+      'Melanggar hukum lagi',
+      'Pindah alamat tanpa melapor dan tidak ditemukan alamat baru',
+      'Meninggal dunia',
+      'Pindah bimbingan ke Bapas lain',
+      'Melanggar syarat khusus pembimbingan',
+    ];
+    const selectedAlasan = suratPengakhiranForm.alasan_pengakhiran;
 
+    // Build termination reason runs with strikethrough
+    const termRuns: TextRun[] = [
+      new TextRun({ text: `Pada hari ${endDay} tanggal ${endDateFull} masa bimbingan diakhiri karena telah `, font: 'Arial', size: 21.6 }),
+    ];
+    alasanOptions.forEach((opt, i) => {
+      const isSelected = opt === selectedAlasan;
+      termRuns.push(new TextRun({
+        text: opt,
+        font: 'Arial',
+        size: 21.6,
+        bold: true,
+        strike: !isSelected,
+      }));
+      if (i < alasanOptions.length - 1) {
+        termRuns.push(new TextRun({ text: ' / ', font: 'Arial', size: 21.6 }));
+      }
+    });
+    termRuns.push(new TextRun({ text: ' (*coret yang tidak perlu).', font: 'Arial', size: 21.6, italics: true }));
+
+    // Identity data items
+    const identityItems: [string, string][] = [
+      ['Nama', profile?.full_name || '-'],
+      ['Nomor Register', suratPengakhiranClient.case_number || '-'],
+      ['Tempat/ Tanggal Lahir', tempatTglLahir],
+      ['Alamat', profile?.address || '-'],
+    ];
+
+    // Build identity paragraphs using tab stops
+    const identityParagraphs = identityItems.map(([label, value]) =>
+      new Paragraph({
+        spacing: { after: 40 },
+        indent: { left: 284 }, // ~1cm indent
+        tabStops: [
+          { type: TabStopType.LEFT, position: 3400 }, // colon position
+          { type: TabStopType.LEFT, position: 3600 }, // value position
+        ],
+        children: [
+          new TextRun({ text: label, font: 'Arial', size: 21.6 }),
+          new TextRun({ text: '\t:\t', font: 'Arial', size: 21.6 }),
+          new TextRun({ text: value, font: 'Arial', size: 21.6 }),
+        ],
+      })
+    );
+
+    // Build KOP header children
+    const kopChildren: (TextRun | ImageRun)[] = [];
+
+    const doc2 = new Document({
+      sections: [{
+        properties: {
+          page: {
+            size: { width: 11906, height: 16838 }, // A4
+            margin: { top: 1134, right: 1021, bottom: 1134, left: 1134 }, // ~2cm top/bottom, ~2.54cm left, ~1.8cm right
+          },
+        },
+        children: [
+          // === KOP SURAT ===
+          ...(logoBuffer ? [new Paragraph({
+            alignment: AlignmentType.CENTER,
+            children: [
+              new ImageRun({
+                type: 'png',
+                data: logoBuffer,
+                transformation: { width: 50, height: 50 },
+                floating: {
+                  horizontalPosition: { offset: 457200 }, // ~left margin area
+                  verticalPosition: { offset: 457200 },
+                  behindDocument: false,
+                },
+                altText: { title: 'Logo', description: 'Logo IMIPAS', name: 'logo' },
+              }),
+            ],
+          })] : []),
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            spacing: { after: 0 },
+            children: [new TextRun({ text: 'KEMENTERIAN IMIGRASI DAN PEMASYARAKATAN', font: 'Arial', size: 20.4 })],
+          }),
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            spacing: { after: 0 },
+            children: [new TextRun({ text: 'DIREKTORAT JENDERAL PEMASYARAKATAN', font: 'Arial', size: 20.4 })],
+          }),
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            spacing: { after: 0 },
+            children: [new TextRun({ text: 'KANTOR WILAYAH JAWA TIMUR', font: 'Arial', size: 20.4 })],
+          }),
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            spacing: { after: 0 },
+            children: [new TextRun({ text: 'BALAI PEMASYARAKATAN KELAS I MALANG', font: 'Arial', size: 21.6, bold: true })],
+          }),
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            spacing: { after: 0 },
+            children: [new TextRun({ text: 'Jalan Barito No. 1, Bunulrejo, Blimbing, Kota Malang, Jawa Timur', font: 'Arial', size: 20.4 })],
+          }),
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            spacing: { after: 0 },
+            border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: '000000', space: 1 } },
+            children: [new TextRun({ text: 'Laman: https://bapasmalang.kemenkumham.go.id  Pos-el: bapasmalang@gmail.com', font: 'Arial', size: 20.4 })],
+          }),
+          // Thin line below
+          new Paragraph({
+            spacing: { after: 200 },
+            border: { bottom: { style: BorderStyle.SINGLE, size: 1, color: '000000', space: 1 } },
+            children: [],
+          }),
+
+          // === JUDUL ===
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            spacing: { after: 0 },
+            children: [new TextRun({ text: 'SURAT PENGAKHIRAN', font: 'Arial', size: 21.6, bold: true, underline: {} })],
+          }),
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            spacing: { after: 240 },
+            children: [new TextRun({ text: `NOMOR: ${nomorSurat}`, font: 'Arial', size: 21.6, bold: true })],
+          }),
+
+          // === PEMBUKA ===
+          new Paragraph({
+            spacing: { after: 200 },
+            children: [new TextRun({ text: 'Kepala Balai Pemasyarakatan (BAPAS) Kelas I Malang, dengan ini menerangkan :', font: 'Arial', size: 21.6 })],
+          }),
+
+          // === DATA IDENTITAS ===
+          ...identityParagraphs,
+
+          // Spacer
+          new Paragraph({ spacing: { after: 120 }, children: [] }),
+
+          // === PARAGRAF ISI — Dasar Hukum ===
+          new Paragraph({
+            alignment: AlignmentType.JUSTIFIED,
+            spacing: { after: 80 },
+            indent: { firstLine: 567 }, // ~1cm
+            children: [new TextRun({
+              text: `Sesuai dengan Surat Keputusan Menteri Imigrasi dan Pemasyarakatan Republik Indonesia tanggal ${tanggalSk} Nomor: ${nomorSk}, perihal ${perihalSk}.`,
+              font: 'Arial',
+              size: 21.6,
+            })],
+          }),
+
+          // === PARAGRAF ISI — Alasan Pengakhiran ===
+          new Paragraph({
+            alignment: AlignmentType.JUSTIFIED,
+            spacing: { after: 80 },
+            indent: { firstLine: 567 },
+            children: termRuns,
+          }),
+
+          // === PENUTUP ===
+          new Paragraph({
+            alignment: AlignmentType.JUSTIFIED,
+            spacing: { after: 200 },
+            indent: { firstLine: 567 },
+            children: [new TextRun({
+              text: 'Demikian surat pengakhiran ini disampaikan. Atas perhatiannya diucapkan terima kasih.',
+              font: 'Arial',
+              size: 21.6,
+            })],
+          }),
+
+          // === TANDA TANGAN ===
+          new Paragraph({
+            alignment: AlignmentType.RIGHT,
+            spacing: { after: 0 },
+            children: [new TextRun({ text: `Malang, ${dateSurat}`, font: 'Arial', size: 21.6 })],
+          }),
+          new Paragraph({
+            alignment: AlignmentType.RIGHT,
+            spacing: { after: 0 },
+            children: [new TextRun({ text: 'Kepala Bapas Kelas I Malang', font: 'Arial', size: 21.6 })],
+          }),
+          // Space for signature
+          new Paragraph({ spacing: { after: 0 }, children: [new TextRun({ text: '', size: 21.6 })] }),
+          new Paragraph({ spacing: { after: 0 }, children: [new TextRun({ text: '', size: 21.6 })] }),
+          new Paragraph({ spacing: { after: 0 }, children: [new TextRun({ text: '', size: 21.6 })] }),
+          new Paragraph({
+            alignment: AlignmentType.RIGHT,
+            spacing: { after: 400 },
+            children: [new TextRun({ text: suratPengakhiranForm.kepala_nama || '............................', font: 'Arial', size: 21.6, bold: true })],
+          }),
+
+          // === TEMBUSAN ===
+          new Paragraph({
+            spacing: { after: 0 },
+            children: [new TextRun({ text: 'Tembusan :', font: 'Arial', size: 20.4 })],
+          }),
+          new Paragraph({
+            spacing: { after: 0 },
+            children: [new TextRun({ text: '1.  Arsip', font: 'Arial', size: 20.4 })],
+          }),
+        ],
+      }],
+    });
+
+    const buffer = await Packer.toBlob(doc2);
     const clientName = (profile?.full_name || 'klien').replace(/\s+/g, '_');
-    doc.save(`Surat_Pengakhiran_${clientName}_${format(new Date(), 'yyyy-MM-dd')}.pdf`);
-    toast.success('PDF Surat Pengakhiran berhasil di-generate');
+    saveAs(buffer, `Surat_Pengakhiran_${clientName}_${format(new Date(), 'yyyy-MM-dd')}.docx`);
+    toast.success('Surat Pengakhiran berhasil di-generate (DOCX)');
     setSuratPengakhiranDialogOpen(false);
   };
 
