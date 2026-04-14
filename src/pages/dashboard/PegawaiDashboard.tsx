@@ -1363,8 +1363,8 @@ export default function PegawaiDashboard() {
                 <Label className="text-xs">Nama Kepala Bapas</Label>
                 <Input value={suratPengakhiranForm.kepala_nama} onChange={e => setSuratPengakhiranForm(f => ({ ...f, kepala_nama: e.target.value }))} placeholder="Nama Kepala Bapas" />
               </div>
-              <Button onClick={generateSuratPengakhiranPdf} className="w-full gap-2">
-                <Download className="w-4 h-4" /> Generate Surat Pengakhiran PDF
+              <Button onClick={generateSuratPengakhiranDocx} className="w-full gap-2">
+                <Download className="w-4 h-4" /> Generate Surat Pengakhiran (Word)
               </Button>
             </div>
           </DialogContent>
