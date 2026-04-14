@@ -12,6 +12,8 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import logoImipas from '@/assets/Logo_IMIPAS.png';
 import { format } from 'date-fns';
+import { Document, Packer, Paragraph, TextRun, AlignmentType, BorderStyle, ImageRun, TabStopType, TabStopPosition } from 'docx';
+import { saveAs } from 'file-saver';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
