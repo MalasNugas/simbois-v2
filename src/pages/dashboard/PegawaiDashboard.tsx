@@ -608,7 +608,8 @@ export default function PegawaiDashboard() {
 
     doc.setFont('helvetica', 'bold');
     doc.text(suratPengakhiranForm.kepala_nama || '............................', ttdX, y, { align: 'right' });
-    y += 30;
+    // Push below photo: photo bottom is at (y - 50 + 90) = y + 40, add small gap
+    y += profile?.avatar_url ? 60 : 30;
 
     // === TEMBUSAN ===
     doc.setFont('helvetica', 'normal');
