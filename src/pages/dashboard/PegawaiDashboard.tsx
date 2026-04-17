@@ -343,7 +343,7 @@ export default function PegawaiDashboard() {
       const img = new Image();
       img.src = logoImipas;
       await new Promise<void>((resolve) => { img.onload = () => resolve(); img.onerror = () => resolve(); });
-      doc.addImage(img, 'PNG', ml, y - 15, 35, 35);
+      doc.addImage(img, 'PNG', ml - 4, y - 20, 46, 46);
     } catch {}
 
     // === KOP SURAT ===
