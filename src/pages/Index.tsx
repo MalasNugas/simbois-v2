@@ -14,8 +14,7 @@ const features = [
 { icon: BookOpen, title: 'Bimbingan Online', desc: 'Program bimbingan kepribadian dan kemandirian yang dapat diakses kapan saja.' },
 { icon: MapPin, title: 'Tracking Lokasi', desc: 'Monitoring lokasi klien berbasis GPS untuk memastikan kepatuhan program reintegrasi.' },
 { icon: Shield, title: 'Keamanan Data', desc: 'Data klien dilindungi dengan sistem keamanan berlapis dan enkripsi modern.' },
-{ icon: BarChart3, title: 'Laporan & Statistik', desc: 'Dashboard analitik lengkap untuk evaluasi efektivitas program bimbingan.' },
-{ icon: Target, title: 'Penyaluran Kerja', desc: 'Fasilitasi penempatan kerja melalui kerjasama dengan Disnaker setempat.' }];
+{ icon: BarChart3, title: 'Laporan & Statistik', desc: 'Dashboard analitik lengkap untuk evaluasi efektivitas program bimbingan.' }];
 
 
 const fadeUp = {
