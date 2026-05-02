@@ -32,6 +32,7 @@ export default function Navbar() {
         {/* Desktop */}
         <div className="hidden md:flex items-center gap-6">
           <Link to="/" className="text-sm text-muted-foreground hover:text-primary transition-colors">Beranda</Link>
+          <Link to="/onboarding" className="text-sm text-muted-foreground hover:text-primary transition-colors">Panduan</Link>
           {user && (
             <Link to={dashboardLink} className="text-sm text-muted-foreground hover:text-primary transition-colors">Dashboard</Link>
           )}
@@ -58,6 +59,7 @@ export default function Navbar() {
       {open && (
         <div className="md:hidden glass-card border-t border-border p-4 space-y-3">
           <Link to="/" className="block text-sm text-muted-foreground" onClick={() => setOpen(false)}>Beranda</Link>
+          <Link to="/onboarding" className="block text-sm text-muted-foreground" onClick={() => setOpen(false)}>Panduan</Link>
           {user && <Link to={dashboardLink} className="block text-sm text-muted-foreground" onClick={() => setOpen(false)}>Dashboard</Link>}
           {!user ? (
             <div className="flex gap-2">
