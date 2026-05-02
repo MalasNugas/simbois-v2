@@ -8,6 +8,7 @@ import Navbar from "@/components/Navbar";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import Onboarding from "./pages/Onboarding";
 import KlienDashboard from "./pages/dashboard/KlienDashboard";
 import PegawaiDashboard from "./pages/dashboard/PegawaiDashboard";
 import AdminDashboard from "./pages/dashboard/AdminDashboard";
@@ -27,6 +28,7 @@ const App = () => (
             <Route path="/" element={<Index />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
+            <Route path="/onboarding" element={<Onboarding />} />
             <Route path="/dashboard/klien" element={<KlienDashboard />} />
             <Route path="/dashboard/pegawai" element={<PegawaiDashboard />} />
             <Route path="/dashboard/admin" element={<AdminDashboard />} />
