@@ -26,7 +26,9 @@ export default function NotificationBell() {
         table: 'notifications',
         filter: `user_id=eq.${user.id}`,
       }, (payload) => {
-        setNotifications(prev => [payload.new as any, ...prev]);
+        const n = payload.new as any;
+        setNotifications(prev => [n, ...prev]);
+        toast(n.title, { description: n.message });
       })
       .subscribe();
 
