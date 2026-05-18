@@ -7,6 +7,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 export default function NotificationBell() {
   const { user } = useAuth();
@@ -25,7 +26,9 @@ export default function NotificationBell() {
         table: 'notifications',
         filter: `user_id=eq.${user.id}`,
       }, (payload) => {
-        setNotifications(prev => [payload.new as any, ...prev]);
+        const n = payload.new as any;
+        setNotifications(prev => [n, ...prev]);
+        toast(n.title, { description: n.message });
       })
       .subscribe();
 
