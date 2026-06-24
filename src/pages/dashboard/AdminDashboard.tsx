@@ -44,12 +44,22 @@ export default function AdminDashboard() {
 
   const load = async () => {
     const [{ data: cls }, { data: pegs }, { data: reps }, { data: perms }] = await Promise.all([
-      supabase.from('clients').select('*, profiles!clients_user_id_fkey(full_name, phone), assigned:profiles!clients_assigned_pk_id_fkey(full_name)'),
+      supabase.from('clients').select('*'),
       supabase.rpc('get_pegawai_list'),
       supabase.from('monthly_reports').select('*').order('created_at', { ascending: false }).limit(500),
       supabase.from('reporting_permissions').select('*').order('granted_at', { ascending: false }).limit(500),
     ]);
-    setClients(cls || []);
+    const allIds = [...new Set([...(cls||[]).map((c:any)=>c.user_id), ...(cls||[]).map((c:any)=>c.assigned_pk_id).filter(Boolean)])];
+    const { data: profs } = allIds.length
+      ? await supabase.from('profiles').select('user_id, full_name, phone').in('user_id', allIds)
+      : { data: [] as any[] };
+    const pmap = new Map((profs || []).map((p: any) => [p.user_id, p]));
+    const enriched = (cls || []).map((c: any) => ({
+      ...c,
+      profiles: pmap.get(c.user_id) || null,
+      assigned: c.assigned_pk_id ? pmap.get(c.assigned_pk_id) || null : null,
+    }));
+    setClients(enriched);
     setPegawai(pegs || []);
     setReports(reps || []);
     setPermissions(perms || []);

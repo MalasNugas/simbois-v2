@@ -40,12 +40,18 @@ export default function PegawaiDashboard() {
   const load = async () => {
     const { data: cls } = await supabase
       .from('clients')
-      .select('id, user_id, case_number, profiles!clients_user_id_fkey(full_name, phone)')
+      .select('id, user_id, case_number')
       .eq('assigned_pk_id', user!.id);
+
+    const userIds = (cls || []).map((c: any) => c.user_id);
+    const { data: profs } = userIds.length
+      ? await supabase.from('profiles').select('user_id, full_name, phone').in('user_id', userIds)
+      : { data: [] as any[] };
+    const pmap = new Map((profs || []).map((p: any) => [p.user_id, p]));
 
     const mapped: Client[] = (cls || []).map((c: any) => ({
       id: c.id, user_id: c.user_id, case_number: c.case_number,
-      full_name: c.profiles?.full_name || '-', phone: c.profiles?.phone || null,
+      full_name: pmap.get(c.user_id)?.full_name || '-', phone: pmap.get(c.user_id)?.phone || null,
     }));
     setClients(mapped);
 
