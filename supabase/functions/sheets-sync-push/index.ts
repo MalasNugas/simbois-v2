@@ -97,15 +97,20 @@ Deno.serve(async (req) => {
     // ---------- 2. Wajib Lapor ----------
     const reportsTab: TabSpec = {
       name: settings.reports_sheet_name || "Wajib Lapor",
-      headers: ["No. Litmas","Nama Klien","Periode","Tanggal Lapor","Status Pekerjaan","Status Operasional","Latitude","Longitude","Status Lokasi","Metode","Catatan","URL Selfie"],
+      headers: ["No. Litmas","Nama Klien","Pegawai PK","Periode","Tanggal Lapor","Hari Ke-","Status Pekerjaan","Status Operasional","Latitude","Longitude","Status Lokasi","Metode","Catatan","URL Selfie"],
       rows: (reports || []).map((r: any) => {
         const cli = cmap.get(r.client_id);
         const pname = cli ? pmap.get(cli.user_id)?.full_name || "" : "";
+        const pk = cli?.assigned_pk_id ? pmap.get(cli.assigned_pk_id)?.full_name || "" : "Belum ditugaskan";
+        const reportDate = r.report_date || r.created_at;
+        const dayOfMonth = reportDate ? new Date(reportDate).getDate() : "";
         return [
           cli?.case_number || "",
           pname,
+          pk,
           `${BULAN[r.report_month] || r.report_month} ${r.report_year}`,
-          fmtDate(r.report_date || r.created_at),
+          fmtDate(reportDate),
+          dayOfMonth,
           r.job_status || "",
           r.operational_status || "",
           r.lat ?? "",
@@ -117,6 +122,7 @@ Deno.serve(async (req) => {
         ];
       }),
     };
+
 
     // ---------- 3. Izin Lapor ----------
     const permsTab: TabSpec = {
@@ -147,26 +153,36 @@ Deno.serve(async (req) => {
     const thisYear = now.getFullYear();
     const pegawaiTab: TabSpec = {
       name: "Pegawai PK",
-      headers: ["Nama Pegawai","Telepon","Jumlah Klien Aktif","Jumlah Klien Selesai","Laporan Bulan Ini","Bergabung Sejak"],
+      headers: ["Nama Pegawai","Telepon","Jumlah Klien Aktif","Jumlah Klien Selesai","Klien Sudah Lapor Bln Ini","Klien Belum Lapor Bln Ini","Laporan Bulan Ini","Bergabung Sejak"],
       rows: (profiles || [])
         .filter((p: any) => pegawaiIds.has(p.user_id))
         .map((p: any) => {
           const myClients = (clients || []).filter((c: any) => c.assigned_pk_id === p.user_id);
-          const active = myClients.filter((c: any) => (c.guidance_status || c.client_status) === "aktif" || (c.guidance_status || c.client_status) === "active").length;
+          const activeClients = myClients.filter((c: any) => {
+            const s = (c.guidance_status || c.client_status || "").toLowerCase();
+            return s === "aktif" || s === "active";
+          });
+          const active = activeClients.length;
           const done = myClients.filter((c: any) => ["selesai","done","terminated"].includes((c.guidance_status || c.client_status || "").toLowerCase())).length;
           const myClientIds = new Set(myClients.map((c: any) => c.id));
-          const reportsThisMonth = (reports || []).filter((r: any) =>
-            myClientIds.has(r.client_id) && r.report_month === thisMonth && r.report_year === thisYear).length;
+          const monthReports = (reports || []).filter((r: any) =>
+            myClientIds.has(r.client_id) && r.report_month === thisMonth && r.report_year === thisYear);
+          const reportedClientIds = new Set(monthReports.map((r: any) => r.client_id));
+          const sudahLapor = activeClients.filter((c: any) => reportedClientIds.has(c.id)).length;
+          const belumLapor = active - sudahLapor;
           return [
             p.full_name || "",
             p.phone || "",
             active,
             done,
-            reportsThisMonth,
+            sudahLapor,
+            belumLapor,
+            monthReports.length,
             fmtDay(p.created_at),
           ];
         }),
     };
+
 
     // ---------- 5. Rekap Bulanan (12 bulan terakhir) ----------
     const rekap: TabSpec = {
@@ -204,7 +220,91 @@ Deno.serve(async (req) => {
       }),
     };
 
-    const allTabs = [clientsTab, reportsTab, permsTab, pegawaiTab, rekap, trackingTab];
+    // ---------- 7. Lapor Harian (30 hari terakhir) ----------
+    const today = new Date(); today.setHours(0,0,0,0);
+    const ymd = (d: Date) => d.toISOString().slice(0,10);
+    const reportsByDay = new Map<string, any[]>();
+    for (const r of (reports || [])) {
+      const dt = r.report_date || r.created_at;
+      if (!dt) continue;
+      const key = ymd(new Date(dt));
+      if (!reportsByDay.has(key)) reportsByDay.set(key, []);
+      reportsByDay.get(key)!.push(r);
+    }
+    const activeClientsAll = (clients || []).filter((c: any) => {
+      const s = (c.guidance_status || c.client_status || "").toLowerCase();
+      return s === "aktif" || s === "active";
+    });
+    const totalActive = activeClientsAll.length || 1;
+    const harianTab: TabSpec = {
+      name: "Lapor Harian",
+      headers: ["Tanggal","Total Lapor","Klien Unik Lapor","Lapor Di Luar Wilayah","% Kepatuhan Harian"],
+      rows: [],
+    };
+    for (let i = 29; i >= 0; i--) {
+      const d = new Date(today); d.setDate(today.getDate() - i);
+      const key = ymd(d);
+      const dayReports = reportsByDay.get(key) || [];
+      const uniq = new Set(dayReports.map((r: any) => r.client_id)).size;
+      const outside = dayReports.filter((r: any) => !inWilayah(r.lat, r.lng)).length;
+      const pct = ((uniq / totalActive) * 100).toFixed(1) + "%";
+      harianTab.rows.push([fmtDay(d.toISOString()), dayReports.length, uniq, outside, pct]);
+    }
+
+    // ---------- 8. Kepatuhan Klien (bulan berjalan) ----------
+    const reportsThisMonthAll = (reports || []).filter((r: any) => r.report_month === thisMonth && r.report_year === thisYear);
+    const lastReportByClient = new Map<string, any>();
+    for (const r of (reports || [])) {
+      const cur = lastReportByClient.get(r.client_id);
+      const rDate = new Date(r.report_date || r.created_at).getTime();
+      if (!cur || rDate > cur._t) lastReportByClient.set(r.client_id, { ...r, _t: rDate });
+    }
+    const reportedThisMonth = new Set(reportsThisMonthAll.map((r: any) => r.client_id));
+    const activePermClients = new Set(
+      (perms || []).filter((p: any) =>
+        p.period_year === thisYear && p.period_month === thisMonth && !p.revoked_at
+      ).map((p: any) => p.client_id),
+    );
+    const kepatuhanTab: TabSpec = {
+      name: "Kepatuhan Klien",
+      headers: ["No. Litmas","Nama Klien","Pegawai PK","Status Bimbingan","Lapor Bulan Ini?","Tanggal Lapor Terakhir","Hari Sejak Lapor Terakhir","Punya Izin Aktif?"],
+      rows: (clients || []).map((c: any) => {
+        const p = pmap.get(c.user_id) || {};
+        const pk = c.assigned_pk_id ? pmap.get(c.assigned_pk_id)?.full_name || "" : "Belum ditugaskan";
+        const last = lastReportByClient.get(c.id);
+        const daysSince = last ? Math.floor((today.getTime() - last._t) / 86400000) : "";
+        return [
+          c.case_number || "",
+          p.full_name || "",
+          pk,
+          c.guidance_status || c.client_status || "",
+          reportedThisMonth.has(c.id) ? "Sudah" : "Belum",
+          last ? fmtDate(last.report_date || last.created_at) : "Belum pernah",
+          daysSince,
+          activePermClients.has(c.id) ? "Ya" : "Tidak",
+        ];
+      }),
+    };
+
+    // ---------- 9. Kinerja Pegawai PK (bulan berjalan) ----------
+    const kinerjaTab: TabSpec = {
+      name: "Kinerja Pegawai PK",
+      headers: ["Nama Pegawai","Jumlah Klien Aktif","Klien Sudah Lapor","Klien Belum Lapor","% Kepatuhan","Klien Lapor Di Luar Wilayah"],
+      rows: (profiles || [])
+        .filter((p: any) => pegawaiIds.has(p.user_id))
+        .map((p: any) => {
+          const myActive = activeClientsAll.filter((c: any) => c.assigned_pk_id === p.user_id);
+          const sudah = myActive.filter((c: any) => reportedThisMonth.has(c.id)).length;
+          const belum = myActive.length - sudah;
+          const pct = myActive.length ? ((sudah / myActive.length) * 100).toFixed(1) + "%" : "-";
+          const myIds = new Set(myActive.map((c: any) => c.id));
+          const outside = reportsThisMonthAll.filter((r: any) => myIds.has(r.client_id) && !inWilayah(r.lat, r.lng)).length;
+          return [p.full_name || "", myActive.length, sudah, belum, pct, outside];
+        }),
+    };
+
+    const allTabs = [clientsTab, reportsTab, permsTab, pegawaiTab, rekap, trackingTab, harianTab, kepatuhanTab, kinerjaTab];
+
 
     // Auto-create missing tabs
     try {

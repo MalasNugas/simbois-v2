@@ -202,11 +202,15 @@ export default function IntegrasiSpreadsheet() {
           <ul className="grid sm:grid-cols-2 gap-2 text-sm">
             {[
               { name: 'Clients', desc: 'Data lengkap klien + Pegawai PK yang ditugaskan' },
-              { name: 'Wajib Lapor', desc: 'Riwayat lapor bulanan + status lokasi geofencing' },
+              { name: 'Wajib Lapor', desc: 'Riwayat lapor + Pegawai PK + hari ke-berapa + status lokasi' },
               { name: 'Izin Lapor', desc: 'Izin lapor yang diberikan Pegawai PK' },
-              { name: 'Pegawai PK', desc: 'Daftar pegawai + jumlah klien & laporan bulan ini' },
+              { name: 'Pegawai PK', desc: 'Daftar pegawai + klien aktif/selesai + sudah/belum lapor' },
               { name: 'Rekap Bulanan', desc: 'Agregasi 12 bulan terakhir' },
               { name: 'Tracking Lokasi', desc: '1000 titik GPS terbaru (geofencing Malang)' },
+              { name: 'Lapor Harian', desc: '30 hari terakhir: total lapor & % kepatuhan per hari' },
+              { name: 'Kepatuhan Klien', desc: 'Per-klien: sudah/belum lapor bulan ini + hari sejak terakhir' },
+              { name: 'Kinerja Pegawai PK', desc: 'KPI kepatuhan klien per pegawai (bulan berjalan)' },
+
             ].map((t) => (
               <li key={t.name} className="flex gap-2 p-2 rounded-lg bg-muted/30">
                 <Badge variant="outline" className="shrink-0">{t.name}</Badge>
