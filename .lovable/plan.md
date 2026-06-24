@@ -1,109 +1,77 @@
+# Integrasi Google Sheets — Wajib Lapor
 
-# Rencana Refactor SIMBOIS — Fokus Wajib Lapor Bulanan
+Tujuan: hubungkan akun Google Sheets workspace ke project, lalu sediakan halaman admin untuk mengatur spreadsheet target dan mapping kolom untuk sinkronisasi data wajib-lapor.
 
-## 1. Pembersihan Fitur Lama
+Spreadsheet referensi:
+`https://docs.google.com/spreadsheets/d/1f7qGIdHOoHsNdZxz-eCoMMWC_QbQw2s5tcI9rfQSNCA` (gid 634536840)
 
-**Dihapus total (UI + tabel + storage):**
-- Semua fitur Surat: `termination_reports`, bucket `termination-files`, halaman & PDF terkait (Termination Workflow PDF, Guidance Report PDF, surat rekomendasi/keterangan).
-- Program & pendaftaran: `programs`, `program_registrations`, bucket `program-files`, trigger `notify_clients_new_program`, komponen pembuatan/daftar program.
-- Chat: `chat_messages`, `ChatWidget.tsx`, `PegawaiChatList.tsx`.
-- Notifikasi program (toast realtime program di `NotificationBell`).
-- Halaman Onboarding lama dirombak jadi panduan singkat 3 role baru.
+## 1. Aktifkan Connector Google Sheets
 
-**Dipertahankan:**
-- `clients`, `profiles`, `user_roles`, `monthly_reports`, `notifications`, `location_tracking`.
-- Auth Admin & Pegawai PK (Email/Password + Google).
-- Geofencing Malang sebagai info, tapi **tidak memblokir absen** (lokasi hanya dicatat).
+- Panggil tool koneksi standar `google_sheets` agar tersedia variabel:
+  - `LOVABLE_API_KEY` (sudah ada)
+  - `GOOGLE_SHEETS_API_KEY` (otomatis setelah link)
+- Semua panggilan Google Sheets dilakukan via Edge Function (server) melalui gateway `https://connector-gateway.lovable.dev/google_sheets/v4/...` — tidak ada kredensial di browser.
+- Catatan: connector mengakses akun Google milik admin (workspace owner), bukan tiap klien. Cocok untuk satu spreadsheet master.
 
-## 2. Struktur Database Baru
+## 2. Skema DB Baru
 
-**Tabel baru `reporting_permissions`** (izin wajib lapor bulanan):
-- `client_id`, `pegawai_id` (pemberi izin), `period_year`, `period_month`, `granted_at`, `revoked_at`, `note`.
-- Unique `(client_id, period_year, period_month)`.
-- RLS: Pegawai PK hanya bisa CRUD untuk client binaannya; Admin full; `anon` boleh `SELECT` baris yg masih aktif (untuk validasi sebelum absen).
+Tabel `sheet_integration_settings` (singleton, hanya admin):
 
-**Tambahan kolom `monthly_reports`:**
-- `selfie_url` (foto selfie wajib saat absen), `lat`, `lng`, `permission_id` (FK ke izin), `submitted_via` = `public_form`.
-- Unique `(client_id, period_year, period_month)` agar 1× per bulan.
+```text
+id uuid pk
+spreadsheet_id text not null
+spreadsheet_url text
+clients_sheet_name text default 'Clients'
+reports_sheet_name text default 'WajibLapor'
+permissions_sheet_name text default 'Permissions'
+column_mapping jsonb  -- { clients: {full_name:'B', case_number:'C', ...}, reports: {...} }
+auto_sync boolean default false
+last_sync_at timestamptz
+last_sync_status text
+created_at, updated_at
+```
 
-**Bucket storage baru:** `wajib-lapor-selfies` (public read, insert anon dibatasi via signed policy).
+RLS: SELECT/INSERT/UPDATE hanya untuk role `admin`. Service role full.
 
-**RLS publik untuk absen tanpa login:**
-- `anon` boleh `SELECT` minimal field `clients` (id, nama, no_litmas, pegawai_id) untuk fitur search.
-- `anon` boleh `INSERT` ke `monthly_reports` **hanya jika** ada `reporting_permissions` aktif untuk client+bulan berjalan (dicek via `SECURITY DEFINER` function `can_submit_report(client_id)`).
-- Upload selfie ke bucket via signed URL dari Edge Function `submit-wajib-lapor` (lebih aman daripada anon insert langsung).
+## 3. Edge Functions
 
-## 3. Alur Client (Tanpa Login)
+Semua memakai gateway + verifikasi role admin (cek JWT → `user_roles`).
 
-Route publik `/wajib-lapor`:
-1. Search nama client (debounced, hit RPC `search_clients_public`).
-2. Pilih client → tampil kartu: nama, no. litmas, status izin bulan ini.
-3. Jika **belum diizinkan** → pesan: *"Anda belum mendapatkan izin wajib lapor untuk bulan ini. Silakan hubungi Pegawai PK/Pembimbing Anda."* Form disabled.
-4. Jika **sudah** → tombol "Mulai Absen":
-   - Minta izin kamera → ambil selfie (canvas capture dari `<video>` `getUserMedia`).
-   - Minta izin geolocation (jika ditolak tetap lanjut, lat/lng = null).
-   - Form: keterangan singkat, status pekerjaan/operasional bulan ini.
-   - Submit → Edge Function `submit-wajib-lapor` (upload selfie → insert `monthly_reports` → tandai izin "used").
-5. Halaman sukses + opsi download bukti.
+- `sheets-list-tabs` — GET metadata spreadsheet → kembalikan daftar nama sheet/tab + header baris 1 (untuk dropdown mapping di UI).
+- `sheets-test-connection` — verifikasi spreadsheet bisa diakses & ringkasan tab.
+- `sheets-sync-push` — push `clients`, `monthly_reports`, `reporting_permissions` ke tab sesuai mapping (clear range → batchUpdate).
+- `sheets-sync-pull` (opsional, dasar) — baca tab Clients untuk update field non-sensitif (mis. catatan). Default off.
 
-Status berubah jadi **"Sudah Wajib Lapor"** (terlihat di dashboard Admin/Pegawai).
+Semua function: CORS, validasi Zod, cek role admin, log error.
 
-## 4. Alur Pegawai PK
+## 4. Halaman UI Baru
 
-- Dashboard: jumlah binaan, sudah/belum lapor bulan ini, daftar yg butuh izin, riwayat izin diberikan, grafik kepatuhan 6 bulan terakhir.
-- Halaman "Client Binaan": tabel client + kolom **Izin Bulan Ini** dengan tombol:
-  - `Berikan Izin` → insert `reporting_permissions` bulan berjalan.
-  - `Cabut Izin` → set `revoked_at` (selama belum dipakai absen).
-- Halaman "Riwayat Wajib Lapor" per client (lihat selfie, lokasi di map, timestamp).
+Rute: `/admin/integrasi-spreadsheet` (hanya admin). Tambah link di sidebar/menu Admin: "Pengaturan → Integrasi Spreadsheet".
 
-## 5. Alur Admin
+Bagian halaman:
 
-- Dashboard global: total client, total pegawai, sudah/belum lapor bulan ini, grafik bulanan (bar 12 bulan), tabel statistik per Pegawai PK (binaan vs lapor), aktivitas terbaru.
-- CRUD Client & Pegawai PK (Pegawai dibuat via Edge Function `create-pegawai` mirip `create-admin`).
-- Halaman "Monitoring Belum Lapor" dengan filter bulan + tombol "Kirim Reminder" (insert ke `notifications` pegawai terkait).
-- Export PDF (`jspdf` + autotable, landscape) & Excel (`xlsx` skill) untuk laporan bulanan & per-pegawai.
+1. **Status Koneksi** — badge "Connector Terhubung / Belum", tombol Test Connection.
+2. **Spreadsheet Target** — input `spreadsheet_url` (auto-extract ID), tombol Simpan + Verifikasi.
+3. **Pemilihan Tab** — 3 dropdown (Clients / WajibLapor / Permissions) diisi dari `sheets-list-tabs`.
+4. **Mapping Kolom** — tabel: kolom DB (kiri) → header sheet (kanan, dropdown dari header tab). Disimpan ke `column_mapping`.
+5. **Sinkronisasi** — toggle Auto-sync, tombol "Push Sekarang" dan "Pull Sekarang", tampilkan `last_sync_at` + status.
+6. **Bantuan** — instruksi singkat: spreadsheet harus dishare ke akun Google connector (read/write).
 
-## 6. Sinkronisasi Google Spreadsheet (2 Arah)
+## 5. Yang TIDAK Dikerjakan di Plan Ini
 
-Lovable Cloud (Supabase) tetap **sumber kebenaran**; Google Sheets jadi *mirror master data* dua arah via connector `google_sheets`.
+- Cron 2-arah otomatis (akan ditambahkan setelah mapping stabil).
+- Sinkronisasi realtime via trigger `pg_net`.
+- Push notifikasi.
 
-**Yang disinkronkan:**
-- Sheet `Clients` (read+write), `Pegawai` (read+write), `WajibLapor` (write only — append), `Izin` (write only — append).
+## Urutan Eksekusi
 
-**Mekanisme:**
-- **DB → Sheet (push):** trigger Postgres (`AFTER INSERT/UPDATE`) memanggil Edge Function `sync-to-sheet` via `pg_net`; function append/update baris berdasarkan `id`.
-- **Sheet → DB (pull):** Edge Function terjadwal `sync-from-sheet` (cron `pg_cron` tiap 5 menit) baca range `Clients!A2:Z`, `Pegawai!A2:Z`, upsert ke DB berdasarkan kolom `id`.
-- Konflik: timestamp `updated_at` terbaru menang (last-write-wins).
-- Setup awal: Admin tempel Spreadsheet ID di halaman **Pengaturan → Integrasi Spreadsheet**, sistem auto-create sheet & header.
+1. Jalankan tool connect `google_sheets` (user pilih/auth koneksi).
+2. Migrasi DB: tabel `sheet_integration_settings` + RLS + GRANT.
+3. Buat 4 edge functions.
+4. Buat halaman `IntegrasiSpreadsheet.tsx` + route + link menu admin.
+5. Test: simpan spreadsheet ID di atas → tarik daftar tab → mapping → Push Sekarang.
 
-**Catatan teknis:** Google Sheets API punya kuota (60 req/menit per user) — sync di-batch, bukan per-baris realtime. Untuk volume besar Supabase tetap dipakai sebagai DB live; Spreadsheet untuk view/edit master oleh staf.
+## Pertanyaan untuk Anda
 
-## 7. Navbar & Routing Baru
-
-- `/` (Landing), `/wajib-lapor` (publik), `/login`, `/dashboard` (Admin/Pegawai), `/clients`, `/pegawai` (admin), `/permissions` (pegawai), `/reports`, `/monitoring`, `/settings/spreadsheet` (admin).
-- Hapus link: Program, Chat, Surat, Onboarding lama.
-
-## 8. Detail Teknis
-
-- **Edge Functions baru:** `submit-wajib-lapor`, `create-pegawai`, `sync-to-sheet`, `sync-from-sheet`, `monthly-permission-reset` (cron 1 hari ke-1 tiap bulan — tidak perlu hapus baris, cukup query by bulan; cron hanya untuk reminder).
-- **Cron pg_cron:** sync sheet tiap 5 menit, reminder belum-lapor tiap tgl 25.
-- **Security:** RLS ketat, `has_role()` reused, `can_submit_report()` SECURITY DEFINER. Anon hanya akses RPC search + Edge Function submit (bukan tabel mentah).
-- **Frontend stack:** tetap React + Tailwind + shadcn, navy/gold glassmorphism dipertahankan, Framer Motion tetap.
-- **Migrasi data lama:** dump `termination_reports`, `programs`, `chat_messages` ke CSV `/mnt/documents/archive/` lalu drop tabel.
-
-## 9. Urutan Implementasi
-
-1. Migrasi DB: drop tabel lama, buat `reporting_permissions`, alter `monthly_reports`, RLS, RPC.
-2. Edge Function `submit-wajib-lapor` + bucket selfie.
-3. Halaman publik `/wajib-lapor` (search → izin check → kamera → submit).
-4. Dashboard & halaman Pegawai PK (izin bulanan).
-5. Dashboard & halaman Admin (CRUD pegawai, monitoring, export).
-6. Pembersihan UI: hapus komponen Program/Chat/Surat, update Navbar.
-7. Integrasi Google Sheets (connect connector, halaman settings, Edge Functions sync, cron).
-8. Update Manual Book PDF sesuai fitur baru.
-
-## 10. Yang Tidak Termasuk
-
-- Push notification background (PWA/FCM).
-- Verifikasi wajah AI dari selfie (hanya simpan foto, tidak ada face-match otomatis).
-- Sinkron realtime ke Spreadsheet (delay s/d 5 menit normal).
+- Spreadsheet di atas akan dishare ke akun Google connector (Editor)? Wajib agar push berhasil.
+- Apakah cukup **push 1-arah dulu** (DB → Sheet), atau langsung butuh pull juga di iterasi ini?
