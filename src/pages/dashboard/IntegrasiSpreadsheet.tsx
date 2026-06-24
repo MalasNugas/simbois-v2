@@ -139,7 +139,20 @@ export default function IntegrasiSpreadsheet() {
     await load();
   };
 
+  const handleCreateTemplate = async () => {
+    if (!settings?.id) { toast.error('Simpan pengaturan dulu'); return; }
+    setCreatingTabs(true);
+    const { data, error } = await supabase.functions.invoke('sheets-create-import-tabs', { body: {} });
+    setCreatingTabs(false);
+    if (error || (data as any)?.error) {
+      toast.error((data as any)?.error || error?.message || 'Gagal membuat template');
+    } else {
+      toast.success('Template tab berhasil dibuat di spreadsheet');
+    }
+  };
+
   const handlePull = async () => {
+
     if (!settings?.id) { toast.error('Simpan pengaturan dulu'); return; }
     if (!pullOpts.pegawai && !pullOpts.clients && !pullOpts.reports) {
       toast.error('Pilih minimal satu tab untuk di-import'); return;
