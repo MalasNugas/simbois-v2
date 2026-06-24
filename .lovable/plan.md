@@ -1,65 +1,55 @@
-# Evaluasi Data Spreadsheet vs Tujuan Website
+# Fitur Import: Spreadsheet → Database
 
-## Tujuan inti website
-1. Memudahkan **Klien** absen / Wajib Lapor jarak jauh (tanpa harus ke kantor).
-2. Memudahkan **Pegawai PK** memantau klien yang ditugaskan.
-3. Memudahkan **Admin** mengawasi seluruh proses & kepatuhan.
+Pilihan **C**: bangun fitur Import (Sheet→DB) supaya data Spreadsheet bisa mengisi Dashboard. Tetap rekomendasikan input lewat aplikasi untuk operasi harian.
 
-## Data yang sudah ada (6 tab) — sudah baik untuk:
-| Tab | Mendukung tujuan? |
-|---|---|
-| Clients | ✅ Master data klien + assignment Pegawai PK |
-| Wajib Lapor | ✅ Bukti absen bulanan (lokasi, selfie, status) |
-| Izin Lapor | ✅ Audit dispensasi |
-| Pegawai PK | ✅ Beban kerja per pegawai |
-| Rekap Bulanan | ✅ Statistik agregat 12 bulan |
-| Tracking Lokasi | ✅ Riwayat GPS realtime |
+## Scope yang aman untuk di-import
 
-## Yang masih kurang untuk tujuan website
+Tidak semua tab cocok untuk di-tarik balik. Beberapa tab adalah **hasil kalkulasi** (Rekap Bulanan, Lapor Harian, Kepatuhan Klien, Kinerja Pegawai PK) — tidak perlu di-import. Tab yang bisa di-import:
 
-Saat ini spreadsheet **belum mencerminkan aktivitas harian** (padahal tujuan utama = absen harian) dan **belum memberi gambaran kepatuhan per klien / per Pegawai PK** secara langsung. Saya usulkan menambah **4 tab** + memperkaya **2 tab** existing.
+| Tab Sheet | Bisa import? | Catatan |
+|---|---|---|
+| **Pegawai PK** | ✅ | Butuh kolom tambahan: `Email`, `Password Awal` (admin set) |
+| **Clients** | ✅ | Butuh kolom tambahan: `Email`, `Password Awal`. Key upsert = `No. Litmas` |
+| **Wajib Lapor** | ⚠️ Opsional | Bisa untuk seed data historis, key = `No. Litmas` + `Periode` |
+| **Izin Lapor** | ❌ | Lewati — workflow real-time di app |
+| **Tracking Lokasi** | ❌ | Lewati — data GPS realtime |
+| Rekap/Harian/Kepatuhan/Kinerja | ❌ | Hasil kalkulasi |
 
-### Tab baru yang diusulkan
+## Cara kerja
 
-**7. `Lapor Harian` (30 hari terakhir)**
-Sejalan dengan widget dashboard baru. Header:
-`Tanggal | Total Lapor | Klien Unik Lapor | Lapor Di Luar Wilayah | % Kepatuhan Harian`
+1. Admin siapkan Sheet dengan minimal 2 tab: `Pegawai PK Import` dan `Clients Import` (saya buatkan template kolom yang dibutuhkan).
+2. Admin klik tombol **"Tarik dari Sheet"** di halaman Integrasi Spreadsheet → pilih tab mana yang mau di-import.
+3. Edge function `sheets-sync-pull` membaca tab, validasi, lalu:
+   - **Pegawai PK**: panggil edge function `create-pegawai` yang sudah ada untuk tiap baris baru (skip kalau email sudah ada).
+   - **Clients**: buat auth user (via Admin API) + insert ke `profiles` + `clients` dengan `case_number` sebagai key upsert. Kolom `Pegawai PK` di-resolve ke `assigned_pk_id` lewat lookup nama.
+   - **Wajib Lapor** (jika dipilih): upsert ke `monthly_reports` berdasarkan `client_id + report_year + report_month`.
+4. Tampilkan ringkasan: berapa baris dibuat / di-update / di-skip / error per tab.
 
-**8. `Kepatuhan Klien` (bulan berjalan)**
-Untuk Pegawai PK & Admin melihat siapa yang belum absen. Header:
-`No. Litmas | Nama Klien | Pegawai PK | Status Bimbingan | Lapor Bulan Ini? | Tanggal Lapor Terakhir | Hari Sejak Lapor Terakhir | Punya Izin Aktif?`
+## Template kolom Sheet (yang harus diisi admin sebelum import)
 
-**9. `Kinerja Pegawai PK` (bulan berjalan)**
-Memperluas tab Pegawai PK dengan KPI kepatuhan. Header:
-`Nama Pegawai | Jumlah Klien Aktif | Klien Sudah Lapor | Klien Belum Lapor | % Kepatuhan | Klien Lapor Di Luar Wilayah`
+**Tab `Pegawai PK Import`**:
+`Nama Pegawai | Email | Password Awal | Telepon`
 
-**10. `Log Aktivitas` (opsional, 500 baris terbaru)**
-Untuk audit. Header:
-`Waktu | Aktor | Peran | Aksi | Target | Detail`
-*(Catatan: butuh tabel `activity_logs` jika belum ada — saya tandai sebagai opsional, tanyakan dulu sebelum eksekusi.)*
+**Tab `Clients Import`**:
+`No. Litmas | Nama Lengkap | Email | Password Awal | Jenis Kelamin | Tempat Lahir | Tgl Lahir | Telepon | Alamat | Status Bimbingan | Status Pekerjaan | Detail Pekerjaan | Mulai Bimbingan | Akhir Bimbingan | Pegawai PK (nama)`
 
-### Perkaya tab existing
+**Tab `Wajib Lapor Import`** (opsional):
+`No. Litmas | Periode (YYYY-MM) | Tanggal Lapor | Status Pekerjaan | Status Operasional | Latitude | Longitude | Catatan`
 
-**Wajib Lapor** — tambahkan kolom:
-- `Pegawai PK` (siapa pembina klien saat lapor) — memudahkan filter per pegawai langsung dari Sheet.
-- `Hari Terlambat` (selisih hari dari awal bulan, untuk analisis kepatuhan).
+## File yang dibuat / diubah
 
-**Pegawai PK** — tambahkan kolom:
-- `Email` (kontak)
-- `Klien Belum Lapor Bulan Ini` (angka, langsung actionable)
+- **Baru** `supabase/functions/sheets-sync-pull/index.ts` — admin-only, baca tab via gateway, validasi Zod, upsert per tabel, return ringkasan.
+- **Diubah** `src/pages/dashboard/IntegrasiSpreadsheet.tsx` — tambah panel "Tarik dari Sheet" dengan checkbox per tab + tombol + tampilan ringkasan hasil.
+- Tidak ada perubahan schema DB. Tidak ada tabel baru.
 
-## Hal yang TIDAK perlu ditambahkan
-- Tab "Absensi" terpisah → dilarang oleh memory project (forbidden feature). Cukup pakai data Wajib Lapor.
-- Kolom "Nama Coach" / "Rujukan Disnaker" di tab baru → forbidden / sudah ada.
+## Keamanan & kehati-hatian
 
-## Implementasi teknis
+- Hanya admin (cek `has_role`) yang bisa memanggil pull.
+- `Password Awal` di Sheet hanya dibaca saat create user lalu di-hash oleh Supabase Auth — admin sebaiknya hapus kolom password setelah import berhasil (akan diingatkan di UI).
+- Mode upsert pakai `case_number` / `email` sebagai key — aman dijalankan berulang tanpa duplikasi.
+- Sebelum eksekusi pertama, tampilkan dialog konfirmasi: "Import akan membuat akun login. Pastikan kolom Email & Password Awal sudah benar."
 
-File yang diubah: hanya `supabase/functions/sheets-sync-push/index.ts`
-- Tambah 3 `TabSpec` baru (Lapor Harian, Kepatuhan Klien, Kinerja Pegawai PK) — semua dihitung in-memory dari data yang sudah di-fetch (tidak perlu query baru).
-- Tambah 2 kolom di `reportsTab` dan 2 kolom di `pegawaiTab`.
-- Update `ensureTabs` call untuk mendaftarkan tab baru (auto-create).
-- Tidak ada perubahan schema DB, tidak ada migration, tidak ada perubahan UI selain mungkin update deskripsi checklist di `IntegrasiSpreadsheet.tsx`.
+## Pertanyaan singkat sebelum eksekusi
 
-## Pertanyaan sebelum eksekusi
-1. Setuju menambah **3 tab** (Lapor Harian, Kepatuhan Klien, Kinerja Pegawai PK) + perkaya 2 tab existing?
-2. Apakah **Log Aktivitas (tab 10)** diperlukan? Ini perlu tabel baru `activity_logs` — bisa skip dulu.
+1. Setuju import mencakup **Pegawai PK + Clients** saja (Wajib Lapor opsional menyusul), dengan kolom Email + Password Awal di Sheet?
+2. Setuju template kolom di atas, atau ada kolom lain yang wajib?

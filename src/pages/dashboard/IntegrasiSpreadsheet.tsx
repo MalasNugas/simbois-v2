@@ -9,7 +9,7 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Loader2, RefreshCw, Save, Upload, PlugZap, ExternalLink } from 'lucide-react';
+import { Loader2, RefreshCw, Save, Upload, Download, PlugZap, ExternalLink, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 
@@ -34,7 +34,11 @@ export default function IntegrasiSpreadsheet() {
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [pulling, setPulling] = useState(false);
+  const [pullResult, setPullResult] = useState<any>(null);
+  const [pullOpts, setPullOpts] = useState({ pegawai: true, clients: true, reports: false });
   const [tabsLoading, setTabsLoading] = useState(false);
+
 
   const [settings, setSettings] = useState<any>(null);
   const [urlInput, setUrlInput] = useState('');
@@ -132,6 +136,28 @@ export default function IntegrasiSpreadsheet() {
     }
     await load();
   };
+
+  const handlePull = async () => {
+    if (!settings?.id) { toast.error('Simpan pengaturan dulu'); return; }
+    if (!pullOpts.pegawai && !pullOpts.clients && !pullOpts.reports) {
+      toast.error('Pilih minimal satu tab untuk di-import'); return;
+    }
+    const ok = window.confirm(
+      'Import akan membuat akun login dari Spreadsheet.\n\nPastikan tab dan kolom (Email, Password Awal, No. Litmas) sudah benar.\n\nLanjutkan?'
+    );
+    if (!ok) return;
+    setPulling(true);
+    setPullResult(null);
+    const { data, error } = await supabase.functions.invoke('sheets-sync-pull', { body: pullOpts });
+    setPulling(false);
+    if (error || (data as any)?.error) {
+      toast.error((data as any)?.error || error?.message || 'Import gagal');
+    } else {
+      setPullResult((data as any).results);
+      toast.success('Import selesai — periksa ringkasan di bawah');
+    }
+  };
+
 
   const updateMap = (group: keyof typeof DB_FIELDS, field: string, header: string) => {
     setMapping((m) => ({ ...m, [group]: { ...(m[group] || {}), [field]: header === '__none__' ? '' : header } }));
@@ -243,7 +269,66 @@ export default function IntegrasiSpreadsheet() {
             </Button>
           </div>
         </div>
+
+        {/* Import (Pull) from Sheet → DB */}
+        <div className="glass-card rounded-2xl p-6 space-y-4">
+          <div className="flex items-center gap-2">
+            <Download className="w-5 h-5 text-primary" />
+            <h2 className="font-semibold">Tarik dari Spreadsheet (Import ke Database)</h2>
+          </div>
+          <div className="text-sm text-muted-foreground space-y-2">
+            <p>Buat tab berikut di spreadsheet dengan kolom yang dibutuhkan, lalu klik <strong>Tarik dari Sheet</strong>:</p>
+            <ul className="text-xs space-y-1 pl-4 list-disc">
+              <li><strong>Pegawai PK Import</strong>: <code>Nama Pegawai | Email | Password Awal | Telepon</code></li>
+              <li><strong>Clients Import</strong>: <code>No. Litmas | Nama Lengkap | Email | Password Awal | Jenis Kelamin | Tempat Lahir | Tgl Lahir | Telepon | Alamat | Status Bimbingan | Status Pekerjaan | Detail Pekerjaan | Mulai Bimbingan | Akhir Bimbingan | Pegawai PK</code></li>
+              <li><strong>Wajib Lapor Import</strong> (opsional): <code>No. Litmas | Periode (YYYY-MM) | Tanggal Lapor | Status Pekerjaan | Status Operasional | Latitude | Longitude | Catatan</code></li>
+            </ul>
+          </div>
+          <div className="flex items-start gap-2 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/30 text-xs">
+            <AlertTriangle className="w-4 h-4 text-yellow-500 shrink-0 mt-0.5" />
+            <span>Setelah import berhasil, <strong>hapus kolom Password Awal</strong> dari spreadsheet untuk keamanan. Mode upsert: data dengan No. Litmas/Email yang sama akan di-update, bukan diduplikasi.</span>
+          </div>
+          <div className="grid sm:grid-cols-3 gap-3">
+            {[
+              { key: 'pegawai', label: 'Pegawai PK Import' },
+              { key: 'clients', label: 'Clients Import' },
+              { key: 'reports', label: 'Wajib Lapor Import' },
+            ].map((opt) => (
+              <label key={opt.key} className="flex items-center gap-2 p-3 rounded-lg bg-muted/30 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={(pullOpts as any)[opt.key]}
+                  onChange={(e) => setPullOpts({ ...pullOpts, [opt.key]: e.target.checked })}
+                  className="w-4 h-4"
+                />
+                <span className="text-sm">{opt.label}</span>
+              </label>
+            ))}
+          </div>
+          <Button onClick={handlePull} disabled={pulling || !settings?.id} variant="secondary" className="gap-2">
+            {pulling ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />} Tarik dari Sheet
+          </Button>
+          {pullResult && (
+            <div className="space-y-2 text-sm">
+              <p className="font-semibold">Ringkasan Import:</p>
+              {Object.entries(pullResult).map(([k, v]: any) => (
+                <div key={k} className="p-3 rounded-lg bg-muted/30 space-y-1">
+                  <p className="font-medium capitalize">{k}</p>
+                  <p className="text-xs">
+                    Dibuat: <strong>{v.created || 0}</strong> · Di-update: <strong>{v.updated || 0}</strong> · Di-skip: <strong>{v.skipped || 0}</strong>
+                  </p>
+                  {v.errors?.length > 0 && (
+                    <ul className="text-xs text-destructive list-disc pl-4 space-y-0.5">
+                      {v.errors.map((e: string, i: number) => <li key={i}>{e}</li>)}
+                    </ul>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
+
     </div>
   );
 }
