@@ -11,6 +11,7 @@ import { Users, CheckCircle2, AlertCircle, Calendar, ShieldCheck, ShieldOff, Eye
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
+import DailyReportStats from '@/components/dashboard/DailyReportStats';
 
 const MONTHS = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
 
@@ -124,6 +125,10 @@ export default function PegawaiDashboard() {
           <StatCard icon={AlertCircle} label="Belum Lapor" value={belumLapor} color="text-yellow-500" />
           <StatCard icon={ShieldCheck} label="Izin Aktif" value={izinDiberikan} color="text-blue-400" />
         </div>
+
+        <DailyReportStats reports={reports} clients={clients} title="Wajib Lapor Harian (Klien Saya)" scopeLabel="Hanya klien yang ditugaskan kepada Anda" />
+
+
 
         <Tabs defaultValue="clients">
           <TabsList>

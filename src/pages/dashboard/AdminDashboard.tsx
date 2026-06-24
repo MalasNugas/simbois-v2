@@ -14,6 +14,7 @@ import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
+import DailyReportStats from '@/components/dashboard/DailyReportStats';
 
 const MONTHS = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agt','Sep','Okt','Nov','Des'];
 
@@ -172,6 +173,10 @@ export default function AdminDashboard() {
           <StatCard icon={CheckCircle2} label="Sudah Lapor" value={sudahLapor} color="text-green-500" />
           <StatCard icon={AlertCircle} label="Belum Lapor" value={belumLapor} color="text-yellow-500" />
         </div>
+
+        <DailyReportStats reports={reports} clients={clients} title="Wajib Lapor Harian (Semua Klien)" scopeLabel="Seluruh klien terdaftar" />
+
+
 
         <div className="glass-card rounded-2xl p-6 mb-8">
           <h2 className="font-semibold mb-4">Grafik Wajib Lapor 12 Bulan Terakhir</h2>
