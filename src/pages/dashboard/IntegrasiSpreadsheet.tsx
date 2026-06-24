@@ -320,9 +320,15 @@ export default function IntegrasiSpreadsheet() {
               </label>
             ))}
           </div>
-          <Button onClick={handlePull} disabled={pulling || !settings?.id} variant="secondary" className="gap-2">
-            {pulling ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />} Tarik dari Sheet
-          </Button>
+          <div className="flex gap-2 flex-wrap">
+            <Button onClick={handleCreateTemplate} disabled={creatingTabs || !settings?.id} variant="outline" className="gap-2">
+              {creatingTabs ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />} Buat Template Tab
+            </Button>
+            <Button onClick={handlePull} disabled={pulling || !settings?.id} variant="secondary" className="gap-2">
+              {pulling ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />} Tarik dari Sheet
+            </Button>
+          </div>
+
           {pullResult && (
             <div className="space-y-2 text-sm">
               <p className="font-semibold">Ringkasan Import:</p>
