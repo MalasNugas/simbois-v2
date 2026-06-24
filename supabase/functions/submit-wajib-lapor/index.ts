@@ -102,12 +102,14 @@ Deno.serve(async (req) => {
     // 6. Notifikasi pegawai PK
     const { data: client } = await supabase
       .from("clients")
-      .select("assigned_pk_id, profiles!clients_user_id_fkey(full_name)")
+      .select("assigned_pk_id, user_id")
       .eq("id", client_id)
       .maybeSingle();
 
     if (client?.assigned_pk_id) {
-      const name = (client as any).profiles?.full_name || "Klien";
+      const { data: prof } = await supabase
+        .from("profiles").select("full_name").eq("user_id", client.user_id).maybeSingle();
+      const name = prof?.full_name || "Klien";
       await supabase.from("notifications").insert({
         user_id: client.assigned_pk_id,
         title: "Wajib Lapor Diterima",
