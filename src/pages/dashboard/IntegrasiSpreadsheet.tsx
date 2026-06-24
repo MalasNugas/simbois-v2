@@ -325,9 +325,10 @@ export default function IntegrasiSpreadsheet() {
             <Button onClick={handleSave} disabled={saving} className="gap-2">
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Simpan Pengaturan
             </Button>
-            <Button onClick={handlePush} disabled={syncing || !settings?.id} variant="secondary" className="gap-2">
+            <Button onClick={handlePush} disabled={syncing || !settings?.id || canWrite === false} variant="secondary" className="gap-2">
               {syncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />} Push Sekarang
             </Button>
+
           </div>
         </div>
 
@@ -367,12 +368,13 @@ export default function IntegrasiSpreadsheet() {
             ))}
           </div>
           <div className="flex gap-2 flex-wrap">
-            <Button onClick={handleCreateTemplate} disabled={creatingTabs || !settings?.id} variant="outline" className="gap-2">
+            <Button onClick={handleCreateTemplate} disabled={creatingTabs || !settings?.id || canWrite === false} variant="outline" className="gap-2">
               {creatingTabs ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />} Buat Template Tab
             </Button>
-            <Button onClick={handlePull} disabled={pulling || !settings?.id} variant="secondary" className="gap-2">
+            <Button onClick={handlePull} disabled={pulling || !settings?.id || canWrite === false} variant="secondary" className="gap-2">
               {pulling ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />} Tarik dari Sheet
             </Button>
+
           </div>
 
           {pullResult && (
