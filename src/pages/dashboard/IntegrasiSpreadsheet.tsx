@@ -35,9 +35,11 @@ export default function IntegrasiSpreadsheet() {
   const [testing, setTesting] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [pulling, setPulling] = useState(false);
+  const [creatingTabs, setCreatingTabs] = useState(false);
   const [pullResult, setPullResult] = useState<any>(null);
   const [pullOpts, setPullOpts] = useState({ pegawai: true, clients: true, reports: false });
   const [tabsLoading, setTabsLoading] = useState(false);
+
 
 
   const [settings, setSettings] = useState<any>(null);
