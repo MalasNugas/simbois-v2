@@ -1,7 +1,7 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
-import { Menu, X, LogOut } from 'lucide-react';
+import { Menu, X, LogOut, ClipboardCheck } from 'lucide-react';
 import NotificationBell from '@/components/NotificationBell';
 import { useState } from 'react';
 
@@ -15,7 +15,7 @@ export default function Navbar() {
     navigate('/');
   };
 
-  const dashboardLink = role === 'admin' ? '/dashboard/admin' : role === 'pegawai' ? '/dashboard/pegawai' : '/dashboard/klien';
+  const dashboardLink = role === 'admin' ? '/dashboard/admin' : '/dashboard/pegawai';
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 glass-card">
@@ -27,18 +27,16 @@ export default function Navbar() {
           </span>
         </Link>
 
-        {/* Desktop */}
         <div className="hidden md:flex items-center gap-6">
           <Link to="/" className="text-sm text-muted-foreground hover:text-primary transition-colors">Beranda</Link>
-          <Link to="/onboarding" className="text-sm text-muted-foreground hover:text-primary transition-colors">Panduan</Link>
+          <Link to="/wajib-lapor" className="text-sm text-primary font-semibold hover:opacity-80 transition-opacity inline-flex items-center gap-1">
+            <ClipboardCheck className="w-4 h-4" /> Wajib Lapor
+          </Link>
           {user && (
             <Link to={dashboardLink} className="text-sm text-muted-foreground hover:text-primary transition-colors">Dashboard</Link>
           )}
           {!user ? (
-            <div className="flex gap-2">
-              <Button variant="ghost" size="sm" onClick={() => navigate('/login')}>Masuk</Button>
-              <Button size="sm" onClick={() => navigate('/register')}>Daftar</Button>
-            </div>
+            <Button variant="ghost" size="sm" onClick={() => navigate('/login')}>Masuk Petugas</Button>
           ) : (
             <div className="flex items-center gap-3">
               <NotificationBell />
@@ -48,7 +46,6 @@ export default function Navbar() {
           )}
         </div>
 
-        {/* Mobile toggle */}
         <button className="md:hidden text-foreground" onClick={() => setOpen(!open)}>
           {open ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
         </button>
@@ -57,13 +54,10 @@ export default function Navbar() {
       {open && (
         <div className="md:hidden glass-card border-t border-border p-4 space-y-3">
           <Link to="/" className="block text-sm text-muted-foreground" onClick={() => setOpen(false)}>Beranda</Link>
-          <Link to="/onboarding" className="block text-sm text-muted-foreground" onClick={() => setOpen(false)}>Panduan</Link>
+          <Link to="/wajib-lapor" className="block text-sm text-primary font-semibold" onClick={() => setOpen(false)}>Wajib Lapor</Link>
           {user && <Link to={dashboardLink} className="block text-sm text-muted-foreground" onClick={() => setOpen(false)}>Dashboard</Link>}
           {!user ? (
-            <div className="flex gap-2">
-              <Button variant="ghost" size="sm" onClick={() => { navigate('/login'); setOpen(false); }}>Masuk</Button>
-              <Button size="sm" onClick={() => { navigate('/register'); setOpen(false); }}>Daftar</Button>
-            </div>
+            <Button variant="ghost" size="sm" onClick={() => { navigate('/login'); setOpen(false); }}>Masuk Petugas</Button>
           ) : (
             <Button variant="ghost" size="sm" onClick={() => { handleSignOut(); setOpen(false); }}>
               <LogOut className="w-4 h-4 mr-2" /> Keluar

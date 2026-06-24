@@ -1,492 +1,314 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/lib/auth';
 import { supabase } from '@/integrations/supabase/client';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Users, Search, AlertTriangle, CheckCircle2, Clock, ShieldCheck, CalendarDays, FileText, Eye } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
+import { Users, ShieldCheck, CheckCircle2, AlertCircle, UserPlus, Loader2, Trash2, Download } from 'lucide-react';
+import { motion } from 'framer-motion';
 import { toast } from 'sonner';
-import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 
-interface PegawaiData {
-  user_id: string;
-  full_name: string;
-  totalClients: number;
-  activeClients: number;
-  needsTermination: number;
-  terminated: number;
-  hasTerminationReport: number;
-  pendingReport: number;
-  clients: ClientDetail[];
-}
-
-interface ClientDetail {
-  id: string;
-  user_id: string;
-  full_name: string;
-  case_number: string | null;
-  guidance_status: string | null;
-  guidance_start: string | null;
-  guidance_end: string | null;
-  client_status: string | null;
-  needsTermination: boolean;
-  hasReport: boolean;
-  termReport: any | null;
-}
+const MONTHS = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agt','Sep','Okt','Nov','Des'];
 
 export default function AdminDashboard() {
-  const { user, role, loading: authLoading } = useAuth();
+  const { user, role, loading } = useAuth();
   const navigate = useNavigate();
-  const [pegawaiList, setPegawaiList] = useState<PegawaiData[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [expandedPegawai, setExpandedPegawai] = useState<string | null>(null);
-  const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'done'>('all');
-  const [guidanceDialogOpen, setGuidanceDialogOpen] = useState(false);
-  const [guidanceClient, setGuidanceClient] = useState<ClientDetail | null>(null);
-  const [guidanceForm, setGuidanceForm] = useState({ guidance_start: '', guidance_end: '' });
-  const [litmasDialogOpen, setLitmasDialogOpen] = useState(false);
-  const [litmasClient, setLitmasClient] = useState<ClientDetail | null>(null);
-  const [litmasValue, setLitmasValue] = useState('');
-  const [termViewDialogOpen, setTermViewDialogOpen] = useState(false);
-  const [termViewReport, setTermViewReport] = useState<any>(null);
-  const [termViewClientName, setTermViewClientName] = useState('');
+  const [clients, setClients] = useState<any[]>([]);
+  const [pegawai, setPegawai] = useState<any[]>([]);
+  const [reports, setReports] = useState<any[]>([]);
+  const [permissions, setPermissions] = useState<any[]>([]);
+  const [newPegawaiOpen, setNewPegawaiOpen] = useState(false);
+  const [newClientOpen, setNewClientOpen] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+
+  // form state
+  const [pegForm, setPegForm] = useState({ email: '', password: '', full_name: '', phone: '' });
+  const [cliForm, setCliForm] = useState({ full_name: '', case_number: '', phone: '', assigned_pk_id: '' });
+
+  const now = new Date();
+  const curYear = now.getFullYear();
+  const curMonth = now.getMonth() + 1;
 
   useEffect(() => {
-    if (!authLoading && role !== 'admin') {
-      toast.error('Anda tidak memiliki akses ke halaman ini');
-      navigate('/');
+    if (loading) return;
+    if (!user || role !== 'admin') { navigate('/login'); return; }
+    load();
+  }, [user, role, loading]);
+
+  const load = async () => {
+    const [{ data: cls }, { data: pegs }, { data: reps }, { data: perms }] = await Promise.all([
+      supabase.from('clients').select('*'),
+      supabase.rpc('get_pegawai_list'),
+      supabase.from('monthly_reports').select('*').order('created_at', { ascending: false }).limit(500),
+      supabase.from('reporting_permissions').select('*').order('granted_at', { ascending: false }).limit(500),
+    ]);
+    const allIds = [...new Set([...(cls||[]).map((c:any)=>c.user_id), ...(cls||[]).map((c:any)=>c.assigned_pk_id).filter(Boolean)])];
+    const { data: profs } = allIds.length
+      ? await supabase.from('profiles').select('user_id, full_name, phone').in('user_id', allIds)
+      : { data: [] as any[] };
+    const pmap = new Map((profs || []).map((p: any) => [p.user_id, p]));
+    const enriched = (cls || []).map((c: any) => ({
+      ...c,
+      profiles: pmap.get(c.user_id) || null,
+      assigned: c.assigned_pk_id ? pmap.get(c.assigned_pk_id) || null : null,
+    }));
+    setClients(enriched);
+    setPegawai(pegs || []);
+    setReports(reps || []);
+    setPermissions(perms || []);
+  };
+
+  const createPegawai = async () => {
+    if (!pegForm.email || !pegForm.password || !pegForm.full_name) {
+      toast.error('Email, password, dan nama wajib diisi'); return;
     }
-  }, [authLoading, role, navigate]);
-
-  useEffect(() => {
-    if (role === 'admin') loadData();
-  }, [role]);
-
-  const loadData = async () => {
-    setLoading(true);
-    try {
-      const [{ data: pegawaiUsers }, { data: allClients }, { data: allProfiles }, { data: termReports }] = await Promise.all([
-        supabase.rpc('get_pegawai_list'),
-        supabase.from('clients').select('*'),
-        supabase.from('profiles').select('user_id, full_name'),
-        supabase.from('termination_reports' as any).select('*'),
-      ]);
-
-      const profileMap = new Map(allProfiles?.map(p => [p.user_id, p.full_name]) || []);
-      const termReportMap = new Map((termReports || []).map((t: any) => [t.client_id, t]));
-      const now = new Date();
-
-      const pegawaiData: PegawaiData[] = (pegawaiUsers || []).map((p: any) => {
-        const myClients = (allClients || []).filter(c => c.assigned_pk_id === p.user_id);
-
-        const clientDetails: ClientDetail[] = myClients.map(c => {
-          const guidanceEndPassed = c.guidance_end && new Date(c.guidance_end) < now;
-          const stillActive = c.guidance_status === 'aktif';
-          const report = termReportMap.get(c.user_id) || null;
-          return {
-            id: c.id, user_id: c.user_id,
-            full_name: profileMap.get(c.user_id) || 'Unknown',
-            case_number: c.case_number,
-            guidance_status: c.guidance_status,
-            guidance_start: c.guidance_start,
-            guidance_end: c.guidance_end,
-            client_status: c.client_status,
-            needsTermination: !!(guidanceEndPassed && stillActive),
-            hasReport: !!report,
-            termReport: report,
-          };
-        });
-
-        const terminatedClients = myClients.filter(c => c.guidance_status === 'selesai');
-        return {
-          user_id: p.user_id,
-          full_name: p.full_name,
-          totalClients: myClients.length,
-          activeClients: myClients.filter(c => c.guidance_status === 'aktif').length,
-          needsTermination: clientDetails.filter(c => c.needsTermination).length,
-          terminated: terminatedClients.length,
-          hasTerminationReport: terminatedClients.filter(c => termReportMap.has(c.user_id)).length,
-          pendingReport: terminatedClients.filter(c => !termReportMap.has(c.user_id)).length,
-          clients: clientDetails,
-        };
-      });
-
-      setPegawaiList(pegawaiData);
-    } catch (err) {
-      toast.error('Gagal memuat data');
-    } finally {
-      setLoading(false);
-    }
+    setSubmitting(true);
+    const { data, error } = await supabase.functions.invoke('create-pegawai', { body: pegForm });
+    setSubmitting(false);
+    if (error || (data as any)?.error) { toast.error((data as any)?.error || error?.message); return; }
+    toast.success('Pegawai PK berhasil dibuat');
+    setNewPegawaiOpen(false);
+    setPegForm({ email: '', password: '', full_name: '', phone: '' });
+    load();
   };
 
-  const openGuidanceDialog = (client: ClientDetail) => {
-    setGuidanceClient(client);
-    setGuidanceForm({ guidance_start: client.guidance_start || '', guidance_end: client.guidance_end || '' });
-    setGuidanceDialogOpen(true);
+  const createClient = async () => {
+    if (!cliForm.full_name || !cliForm.case_number) { toast.error('Nama dan No. Litmas wajib'); return; }
+    setSubmitting(true);
+    // Create dummy auth user for client (no login though)
+    const tmpEmail = `client.${cliForm.case_number.toLowerCase().replace(/[^a-z0-9]/g,'')}.${Date.now()}@simbois.local`;
+    const { data: auth, error: aerr } = await supabase.auth.signUp({
+      email: tmpEmail, password: crypto.randomUUID(),
+      options: { data: { full_name: cliForm.full_name } },
+    });
+    if (aerr || !auth.user) { setSubmitting(false); toast.error(aerr?.message || 'Gagal'); return; }
+
+    await supabase.from('user_roles').insert({ user_id: auth.user.id, role: 'klien' });
+    if (cliForm.phone) await supabase.from('profiles').update({ phone: cliForm.phone }).eq('user_id', auth.user.id);
+    await supabase.from('clients').insert({
+      user_id: auth.user.id,
+      case_number: cliForm.case_number,
+      assigned_pk_id: cliForm.assigned_pk_id || null,
+    });
+    setSubmitting(false);
+    toast.success('Klien ditambahkan');
+    setNewClientOpen(false);
+    setCliForm({ full_name: '', case_number: '', phone: '', assigned_pk_id: '' });
+    load();
   };
 
-  const saveGuidancePeriod = async () => {
-    if (!guidanceClient) return;
-    const { error } = await supabase.from('clients').update({
-      guidance_start: guidanceForm.guidance_start || null,
-      guidance_end: guidanceForm.guidance_end || null,
-    } as any).eq('user_id', guidanceClient.user_id);
+  const deleteClient = async (id: string) => {
+    if (!confirm('Hapus klien ini?')) return;
+    const { error } = await supabase.from('clients').delete().eq('id', id);
     if (error) { toast.error(error.message); return; }
-    toast.success('Masa bimbingan berhasil diperbarui');
-    setGuidanceDialogOpen(false);
-    loadData();
+    toast.success('Klien dihapus'); load();
   };
 
-  const openLitmasDialog = (client: ClientDetail) => {
-    setLitmasClient(client);
-    setLitmasValue(client.case_number || '');
-    setLitmasDialogOpen(true);
-  };
+  // Stats
+  const reportedThisMonth = reports.filter(r => r.report_year === curYear && r.report_month === curMonth);
+  const sudahLaporIds = new Set(reportedThisMonth.map(r => r.client_id));
+  const sudahLapor = sudahLaporIds.size;
+  const belumLapor = clients.length - sudahLapor;
 
-  const saveLitmas = async () => {
-    if (!litmasClient) return;
-    const { error } = await supabase.from('clients').update({ case_number: litmasValue || null } as any).eq('user_id', litmasClient.user_id);
-    if (error) { toast.error(error.message); return; }
-    toast.success('No. Litmas berhasil diperbarui');
-    setLitmasDialogOpen(false);
-    loadData();
-  };
-
-  const openTermViewDialog = (report: any, clientName: string) => {
-    setTermViewReport(report);
-    setTermViewClientName(clientName);
-    setTermViewDialogOpen(true);
-  };
-
-  const approveTermination = async (reportId: string, status: 'approved' | 'rejected') => {
-    const { error } = await supabase.from('termination_reports' as any).update({ approval_status: status }).eq('id', reportId);
-    if (error) { toast.error(error.message); return; }
-    toast.success(status === 'approved' ? 'Laporan pengakhiran disetujui' : 'Laporan pengakhiran ditolak');
-    setTermViewDialogOpen(false);
-    loadData();
-  };
-
-  const totalPegawai = pegawaiList.length;
-  const totalNeedsTermination = pegawaiList.reduce((sum, p) => sum + p.needsTermination, 0);
-  const totalAllClients = pegawaiList.reduce((sum, p) => sum + p.totalClients, 0);
-  const totalTerminated = pegawaiList.reduce((sum, p) => sum + p.hasTerminationReport, 0);
-  const totalPendingReport = pegawaiList.reduce((sum, p) => sum + p.pendingReport, 0);
-
-  const filteredPegawai = pegawaiList.filter(p => {
-    const matchSearch = p.full_name.toLowerCase().includes(searchQuery.toLowerCase());
-    if (filterStatus === 'pending') return matchSearch && (p.needsTermination > 0 || p.pendingReport > 0);
-    if (filterStatus === 'done') return matchSearch && p.needsTermination === 0 && p.pendingReport === 0;
-    return matchSearch;
+  // Chart 12 bulan terakhir
+  const chartData = Array.from({ length: 12 }, (_, i) => {
+    const d = new Date(curYear, curMonth - 1 - (11 - i), 1);
+    const y = d.getFullYear(), m = d.getMonth() + 1;
+    const count = reports.filter(r => r.report_year === y && r.report_month === m).length;
+    return { label: `${MONTHS[m-1]} ${String(y).slice(2)}`, jumlah: count };
   });
 
-  if (authLoading || (role !== 'admin')) {
-    return (
-      <div className="min-h-screen flex items-center justify-center pt-20">
-        <p className="text-muted-foreground">Memuat...</p>
-      </div>
-    );
-  }
+  // Per pegawai
+  const pegStats = pegawai.map((p: any) => {
+    const binaan = clients.filter(c => c.assigned_pk_id === p.user_id);
+    const lapor = binaan.filter(c => sudahLaporIds.has(c.id)).length;
+    return { ...p, binaan: binaan.length, lapor, belum: binaan.length - lapor };
+  });
+
+  const exportCSV = () => {
+    const rows = [['Nama','No.Litmas','Pegawai PK','Status Lapor Bulan Ini']];
+    clients.forEach((c: any) => {
+      rows.push([
+        c.profiles?.full_name || '-',
+        c.case_number || '-',
+        c.assigned?.full_name || '-',
+        sudahLaporIds.has(c.id) ? 'Sudah' : 'Belum',
+      ]);
+    });
+    const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `wajib-lapor-${curYear}-${curMonth}.csv`;
+    a.click();
+  };
+
+  if (loading) return <div className="min-h-screen flex items-center justify-center pt-16"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
 
   return (
-    <div className="min-h-screen bg-background pt-20 px-4 pb-10">
-      <div className="container mx-auto max-w-7xl space-y-6">
-        {/* Header */}
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-            <ShieldCheck className="w-5 h-5 text-primary" />
-          </div>
+    <div className="min-h-screen pt-20 pb-12 px-4">
+      <div className="container mx-auto max-w-7xl">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="flex justify-between items-center mb-8 flex-wrap gap-3">
           <div>
-            <h1 className="text-2xl font-bold text-foreground">Dashboard Admin</h1>
-            <p className="text-sm text-muted-foreground">Pantau seluruh Pegawai PK dan status laporan pengakhiran</p>
+            <h1 className="text-3xl font-bold">Dashboard Admin</h1>
+            <p className="text-muted-foreground">Periode: {MONTHS[curMonth-1]} {curYear}</p>
           </div>
+          <Button variant="outline" onClick={exportCSV} className="gap-2"><Download className="w-4 h-4" /> Export CSV</Button>
+        </motion.div>
+
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+          <StatCard icon={Users} label="Total Klien" value={clients.length} color="text-primary" />
+          <StatCard icon={ShieldCheck} label="Total Pegawai PK" value={pegawai.length} color="text-blue-400" />
+          <StatCard icon={CheckCircle2} label="Sudah Lapor" value={sudahLapor} color="text-green-500" />
+          <StatCard icon={AlertCircle} label="Belum Lapor" value={belumLapor} color="text-yellow-500" />
         </div>
 
-        {/* Summary Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <Card>
-            <CardContent className="p-4 flex items-center gap-3">
-              <Users className="w-8 h-8 text-primary" />
-              <div>
-                <p className="text-2xl font-bold text-foreground">{totalPegawai}</p>
-                <p className="text-xs text-muted-foreground">Total Pegawai PK</p>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4 flex items-center gap-3">
-              <Users className="w-8 h-8 text-blue-500" />
-              <div>
-                <p className="text-2xl font-bold text-foreground">{totalAllClients}</p>
-                <p className="text-xs text-muted-foreground">Total Klien</p>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4 flex items-center gap-3">
-              <AlertTriangle className="w-8 h-8 text-destructive" />
-              <div>
-                <p className="text-2xl font-bold text-foreground">{totalNeedsTermination}</p>
-                <p className="text-xs text-muted-foreground">Perlu Pengakhiran</p>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4 flex items-center gap-3">
-              <CheckCircle2 className="w-8 h-8 text-green-600" />
-              <div>
-                <p className="text-2xl font-bold text-foreground">{totalTerminated}</p>
-                <p className="text-xs text-muted-foreground">Laporan Selesai</p>
-              </div>
-            </CardContent>
-          </Card>
-          {totalPendingReport > 0 && (
-            <Card className="col-span-2 md:col-span-4 border-destructive/30 bg-destructive/5">
-              <CardContent className="p-4 flex items-center gap-3">
-                <Clock className="w-6 h-6 text-destructive" />
-                <p className="text-sm text-destructive font-medium">
-                  {totalPendingReport} klien sudah selesai bimbingan tapi Pegawai PK belum membuat Laporan Pengakhiran
-                </p>
-              </CardContent>
-            </Card>
-          )}
+        <div className="glass-card rounded-2xl p-6 mb-8">
+          <h2 className="font-semibold mb-4">Grafik Wajib Lapor 12 Bulan Terakhir</h2>
+          <ResponsiveContainer width="100%" height={260}>
+            <BarChart data={chartData}>
+              <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
+              <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+              <YAxis tick={{ fontSize: 11 }} />
+              <Tooltip contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }} />
+              <Bar dataKey="jumlah" fill="hsl(var(--primary))" radius={[6,6,0,0]} />
+            </BarChart>
+          </ResponsiveContainer>
         </div>
 
-        {/* Filter & Search */}
-        <Card>
-          <CardContent className="p-4 flex flex-col sm:flex-row gap-3">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input placeholder="Cari nama pegawai..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-10" />
-            </div>
-            <div className="flex gap-2">
-              <button onClick={() => setFilterStatus('all')} className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${filterStatus === 'all' ? 'bg-primary text-primary-foreground' : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'}`}>Semua</button>
-              <button onClick={() => setFilterStatus('pending')} className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${filterStatus === 'pending' ? 'bg-destructive text-destructive-foreground' : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'}`}>Belum Lapor</button>
-              <button onClick={() => setFilterStatus('done')} className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${filterStatus === 'done' ? 'bg-green-600 text-white' : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'}`}>Sudah Selesai</button>
-            </div>
-          </CardContent>
-        </Card>
+        <Tabs defaultValue="clients">
+          <TabsList>
+            <TabsTrigger value="clients">Klien</TabsTrigger>
+            <TabsTrigger value="pegawai">Pegawai PK</TabsTrigger>
+            <TabsTrigger value="monitoring">Monitoring</TabsTrigger>
+            <TabsTrigger value="stats">Statistik Pegawai</TabsTrigger>
+          </TabsList>
 
-        {/* Pegawai Table */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Daftar Pegawai PK</CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            {loading ? (
-              <div className="p-8 text-center text-muted-foreground">Memuat data...</div>
-            ) : filteredPegawai.length === 0 ? (
-              <div className="p-8 text-center text-muted-foreground">Tidak ada data pegawai ditemukan</div>
-            ) : (
+          <TabsContent value="clients" className="mt-4">
+            <div className="flex justify-end mb-3">
+              <Dialog open={newClientOpen} onOpenChange={setNewClientOpen}>
+                <DialogTrigger asChild><Button className="gap-2"><UserPlus className="w-4 h-4" /> Tambah Klien</Button></DialogTrigger>
+                <DialogContent>
+                  <DialogHeader><DialogTitle>Tambah Klien Baru</DialogTitle></DialogHeader>
+                  <div className="space-y-3">
+                    <div><Label>Nama Lengkap</Label><Input value={cliForm.full_name} onChange={e=>setCliForm({...cliForm,full_name:e.target.value})} /></div>
+                    <div><Label>No. Litmas</Label><Input value={cliForm.case_number} onChange={e=>setCliForm({...cliForm,case_number:e.target.value})} /></div>
+                    <div><Label>No. Telepon</Label><Input value={cliForm.phone} onChange={e=>setCliForm({...cliForm,phone:e.target.value})} /></div>
+                    <div><Label>Pegawai PK</Label>
+                      <select className="w-full bg-secondary rounded-md p-2 text-sm" value={cliForm.assigned_pk_id} onChange={e=>setCliForm({...cliForm,assigned_pk_id:e.target.value})}>
+                        <option value="">— pilih —</option>
+                        {pegawai.map((p:any) => <option key={p.user_id} value={p.user_id}>{p.full_name}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                  <DialogFooter><Button onClick={createClient} disabled={submitting}>{submitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}Simpan</Button></DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </div>
+            <div className="glass-card rounded-2xl p-4 overflow-x-auto">
               <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>No</TableHead>
-                    <TableHead>Nama Pegawai PK</TableHead>
-                    <TableHead className="text-center">Total Klien</TableHead>
-                    <TableHead className="text-center">Klien Aktif</TableHead>
-                    <TableHead className="text-center">Perlu Pengakhiran</TableHead>
-                    <TableHead className="text-center">Sudah Diakhiri</TableHead>
-                    <TableHead className="text-center">Laporan Pengakhiran</TableHead>
-                    <TableHead className="text-center">Status</TableHead>
-                  </TableRow>
-                </TableHeader>
+                <TableHeader><TableRow><TableHead>Nama</TableHead><TableHead>No. Litmas</TableHead><TableHead>Pegawai PK</TableHead><TableHead>Status Lapor</TableHead><TableHead></TableHead></TableRow></TableHeader>
                 <TableBody>
-                  {filteredPegawai.map((p, idx) => (
-                    <>
-                      <TableRow key={p.user_id} className="cursor-pointer hover:bg-muted/50" onClick={() => setExpandedPegawai(expandedPegawai === p.user_id ? null : p.user_id)}>
-                        <TableCell>{idx + 1}</TableCell>
-                        <TableCell className="font-medium">{p.full_name}</TableCell>
-                        <TableCell className="text-center">{p.totalClients}</TableCell>
-                        <TableCell className="text-center">{p.activeClients}</TableCell>
-                        <TableCell className="text-center">
-                          {p.needsTermination > 0 ? <Badge variant="destructive">{p.needsTermination}</Badge> : <span className="text-muted-foreground">0</span>}
-                        </TableCell>
-                        <TableCell className="text-center">{p.terminated}</TableCell>
-                        <TableCell className="text-center">
-                          {p.hasTerminationReport > 0 && <Badge className="bg-green-600 hover:bg-green-700">{p.hasTerminationReport}</Badge>}
-                          {p.pendingReport > 0 && <Badge variant="destructive" className="ml-1">{p.pendingReport} belum</Badge>}
-                          {p.hasTerminationReport === 0 && p.pendingReport === 0 && <span className="text-muted-foreground">0</span>}
-                        </TableCell>
-                        <TableCell className="text-center">
-                          {p.needsTermination > 0 || p.pendingReport > 0 ? (
-                            <Badge variant="destructive" className="gap-1"><Clock className="w-3 h-3" /> Belum Lengkap</Badge>
-                          ) : p.terminated > 0 && p.hasTerminationReport === p.terminated ? (
-                            <Badge className="gap-1 bg-green-600 hover:bg-green-700"><CheckCircle2 className="w-3 h-3" /> Selesai</Badge>
-                          ) : (
-                            <Badge variant="secondary" className="gap-1"><Clock className="w-3 h-3" /> Dalam Proses</Badge>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                      {expandedPegawai === p.user_id && p.clients.length > 0 && (
-                        <TableRow key={`${p.user_id}-detail`}>
-                          <TableCell colSpan={8} className="bg-muted/30 p-0">
-                            <div className="p-4">
-                              <p className="text-sm font-semibold text-muted-foreground mb-2">Detail Klien - {p.full_name}</p>
-                              <Table>
-                                <TableHeader>
-                                  <TableRow>
-                                    <TableHead>Nama Klien</TableHead>
-                                    <TableHead>No. Litmas</TableHead>
-                                    <TableHead>Status Bimbingan</TableHead>
-                                    <TableHead>Masa Bimbingan</TableHead>
-                                    <TableHead>Laporan Pengakhiran</TableHead>
-                                    <TableHead>Keterangan</TableHead>
-                                    <TableHead>Aksi</TableHead>
-                                  </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                  {p.clients.map(c => (
-                                    <TableRow key={c.id}>
-                                      <TableCell>{c.full_name}</TableCell>
-                                      <TableCell>{c.case_number || '-'}</TableCell>
-                                      <TableCell>
-                                        <Badge variant={c.guidance_status === 'aktif' ? 'default' : 'secondary'} className="capitalize">{c.guidance_status || '-'}</Badge>
-                                      </TableCell>
-                                      <TableCell className="text-xs">
-                                        {c.guidance_start && c.guidance_end ? `${c.guidance_start} s/d ${c.guidance_end}` : '-'}
-                                      </TableCell>
-                                      <TableCell>
-                                        {c.guidance_status === 'selesai' ? (
-                                          c.hasReport ? (
-                                            <div className="flex items-center gap-1">
-                                              <Badge className="bg-green-600 hover:bg-green-700 gap-1"><CheckCircle2 className="w-3 h-3" /> Sudah</Badge>
-                                              {c.termReport?.approval_status === 'approved' && <Badge className="bg-green-700 text-xs">ACC</Badge>}
-                                              {c.termReport?.approval_status === 'rejected' && <Badge variant="destructive" className="text-xs">Ditolak</Badge>}
-                                              {c.termReport?.approval_status === 'pending' && <Badge variant="secondary" className="text-xs">Menunggu ACC</Badge>}
-                                            </div>
-                                          ) : (
-                                            <Badge variant="destructive" className="gap-1"><Clock className="w-3 h-3" /> Belum Dibuat</Badge>
-                                          )
-                                        ) : (
-                                          <span className="text-muted-foreground text-xs">-</span>
-                                        )}
-                                      </TableCell>
-                                      <TableCell>
-                                        {c.needsTermination ? (
-                                          <Badge variant="destructive" className="gap-1"><AlertTriangle className="w-3 h-3" /> Perlu Pengakhiran</Badge>
-                                        ) : c.guidance_status === 'selesai' ? (
-                                          c.hasReport ? (
-                                            <Badge className="bg-green-600 hover:bg-green-700 gap-1"><CheckCircle2 className="w-3 h-3" /> Selesai</Badge>
-                                          ) : (
-                                            <Badge variant="secondary" className="gap-1"><Clock className="w-3 h-3" /> Menunggu Laporan</Badge>
-                                          )
-                                        ) : (
-                                          <span className="text-muted-foreground text-xs">-</span>
-                                        )}
-                                      </TableCell>
-                                      <TableCell>
-                                        <div className="flex gap-1 flex-wrap">
-                                          <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); openGuidanceDialog(c); }} title="Atur Masa Bimbingan">
-                                            <CalendarDays className="w-3 h-3 mr-1" /> Masa
-                                          </Button>
-                                          <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); openLitmasDialog(c); }} title="Atur No. Litmas">
-                                            <FileText className="w-3 h-3 mr-1" /> Litmas
-                                          </Button>
-                                          {c.hasReport && c.termReport && (
-                                            <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); openTermViewDialog(c.termReport, c.full_name); }} title="Lihat Laporan Pengakhiran">
-                                              <Eye className="w-3 h-3 mr-1" /> Lihat
-                                            </Button>
-                                          )}
-                                        </div>
-                                      </TableCell>
-                                    </TableRow>
-                                  ))}
-                                </TableBody>
-                              </Table>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      )}
-                    </>
+                  {clients.map((c:any) => (
+                    <TableRow key={c.id}>
+                      <TableCell className="font-medium">{c.profiles?.full_name || '-'}</TableCell>
+                      <TableCell className="text-muted-foreground">{c.case_number || '-'}</TableCell>
+                      <TableCell>{c.assigned?.full_name || '-'}</TableCell>
+                      <TableCell>{sudahLaporIds.has(c.id) ? <Badge className="bg-green-500/15 text-green-500">Sudah</Badge> : <Badge variant="outline">Belum</Badge>}</TableCell>
+                      <TableCell className="text-right"><Button size="icon" variant="ghost" onClick={()=>deleteClient(c.id)}><Trash2 className="w-4 h-4 text-destructive" /></Button></TableCell>
+                    </TableRow>
                   ))}
                 </TableBody>
               </Table>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Guidance Period Dialog */}
-        <Dialog open={guidanceDialogOpen} onOpenChange={setGuidanceDialogOpen}>
-          <DialogContent className="bg-card border-border">
-            <DialogHeader><DialogTitle>Atur Masa Bimbingan</DialogTitle></DialogHeader>
-            <p className="text-sm text-muted-foreground mb-2">Klien: <strong>{guidanceClient?.full_name}</strong></p>
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label>Tanggal Mulai Bimbingan</Label>
-                <Input type="date" value={guidanceForm.guidance_start} onChange={e => setGuidanceForm(f => ({ ...f, guidance_start: e.target.value }))} />
-              </div>
-              <div className="space-y-2">
-                <Label>Tanggal Berakhir Bimbingan</Label>
-                <Input type="date" value={guidanceForm.guidance_end} onChange={e => setGuidanceForm(f => ({ ...f, guidance_end: e.target.value }))} />
-              </div>
-              <Button onClick={saveGuidancePeriod} className="w-full">Simpan</Button>
             </div>
-          </DialogContent>
-        </Dialog>
+          </TabsContent>
 
-        {/* No. Litmas Dialog */}
-        <Dialog open={litmasDialogOpen} onOpenChange={setLitmasDialogOpen}>
-          <DialogContent className="bg-card border-border">
-            <DialogHeader><DialogTitle>Atur No. Litmas</DialogTitle></DialogHeader>
-            <p className="text-sm text-muted-foreground mb-2">Klien: <strong>{litmasClient?.full_name}</strong></p>
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label>No. Litmas / Nomor Register</Label>
-                <Input value={litmasValue} onChange={e => setLitmasValue(e.target.value)} placeholder="Contoh: 451/BKD/CB/XII/2025" />
-              </div>
-              <Button onClick={saveLitmas} className="w-full">Simpan</Button>
+          <TabsContent value="pegawai" className="mt-4">
+            <div className="flex justify-end mb-3">
+              <Dialog open={newPegawaiOpen} onOpenChange={setNewPegawaiOpen}>
+                <DialogTrigger asChild><Button className="gap-2"><UserPlus className="w-4 h-4" /> Tambah Pegawai PK</Button></DialogTrigger>
+                <DialogContent>
+                  <DialogHeader><DialogTitle>Tambah Pegawai PK</DialogTitle></DialogHeader>
+                  <div className="space-y-3">
+                    <div><Label>Nama Lengkap</Label><Input value={pegForm.full_name} onChange={e=>setPegForm({...pegForm,full_name:e.target.value})} /></div>
+                    <div><Label>Email</Label><Input type="email" value={pegForm.email} onChange={e=>setPegForm({...pegForm,email:e.target.value})} /></div>
+                    <div><Label>Password</Label><Input type="password" value={pegForm.password} onChange={e=>setPegForm({...pegForm,password:e.target.value})} /></div>
+                    <div><Label>No. Telepon</Label><Input value={pegForm.phone} onChange={e=>setPegForm({...pegForm,phone:e.target.value})} /></div>
+                  </div>
+                  <DialogFooter><Button onClick={createPegawai} disabled={submitting}>{submitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}Simpan</Button></DialogFooter>
+                </DialogContent>
+              </Dialog>
             </div>
-          </DialogContent>
-        </Dialog>
+            <div className="glass-card rounded-2xl p-4 overflow-x-auto">
+              <Table>
+                <TableHeader><TableRow><TableHead>Nama</TableHead><TableHead>Klien Binaan</TableHead></TableRow></TableHeader>
+                <TableBody>
+                  {pegStats.map((p:any) => (
+                    <TableRow key={p.user_id}>
+                      <TableCell>{p.full_name}</TableCell>
+                      <TableCell>{p.binaan}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </TabsContent>
 
-        {/* Termination Report View & Approval Dialog */}
-        <Dialog open={termViewDialogOpen} onOpenChange={setTermViewDialogOpen}>
-          <DialogContent className="bg-card border-border max-w-lg">
-            <DialogHeader><DialogTitle>Laporan Pengakhiran</DialogTitle></DialogHeader>
-            {termViewReport && (
-              <div className="space-y-4">
-                <div className="space-y-2 text-sm">
-                  <p><span className="text-muted-foreground">Klien:</span> <strong>{termViewClientName}</strong></p>
-                  <p><span className="text-muted-foreground">Tanggal Laporan:</span> {termViewReport.report_date ? format(new Date(termViewReport.report_date), 'dd MMM yyyy') : '-'}</p>
-                  <p><span className="text-muted-foreground">Catatan:</span> {termViewReport.notes || '-'}</p>
-                  <p><span className="text-muted-foreground">Status:</span>{' '}
-                    {termViewReport.approval_status === 'approved' ? <Badge className="bg-green-600">Disetujui</Badge> :
-                     termViewReport.approval_status === 'rejected' ? <Badge variant="destructive">Ditolak</Badge> :
-                     <Badge variant="secondary">Menunggu Persetujuan</Badge>}
-                  </p>
-                </div>
-                {termViewReport.file_url && (
-                  <div className="border rounded-lg overflow-hidden">
-                    <iframe src={termViewReport.file_url} className="w-full h-[400px]" title="Laporan Pengakhiran PDF" />
-                    <div className="p-2 bg-muted/30">
-                      <a href={termViewReport.file_url} target="_blank" rel="noopener noreferrer" className="text-sm text-primary underline flex items-center gap-1">
-                        <FileText className="w-4 h-4" /> Buka PDF di tab baru
-                      </a>
-                    </div>
-                  </div>
-                )}
-                {termViewReport.approval_status === 'pending' && (
-                  <div className="flex gap-3">
-                    <Button onClick={() => approveTermination(termViewReport.id, 'approved')} className="flex-1 bg-green-600 hover:bg-green-700">
-                      <CheckCircle2 className="w-4 h-4 mr-1" /> Setujui (ACC)
-                    </Button>
-                    <Button variant="destructive" onClick={() => approveTermination(termViewReport.id, 'rejected')} className="flex-1">
-                      Tolak
-                    </Button>
-                  </div>
-                )}
-              </div>
-            )}
-          </DialogContent>
-        </Dialog>
+          <TabsContent value="monitoring" className="mt-4">
+            <div className="glass-card rounded-2xl p-4 overflow-x-auto">
+              <h3 className="font-semibold mb-3 text-yellow-500">Klien Belum Lapor Bulan Ini</h3>
+              <Table>
+                <TableHeader><TableRow><TableHead>Nama</TableHead><TableHead>No. Litmas</TableHead><TableHead>Pegawai PK</TableHead></TableRow></TableHeader>
+                <TableBody>
+                  {clients.filter((c:any) => !sudahLaporIds.has(c.id)).map((c:any) => (
+                    <TableRow key={c.id}>
+                      <TableCell>{c.profiles?.full_name || '-'}</TableCell>
+                      <TableCell>{c.case_number || '-'}</TableCell>
+                      <TableCell>{c.assigned?.full_name || '-'}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="stats" className="mt-4">
+            <div className="glass-card rounded-2xl p-4 overflow-x-auto">
+              <Table>
+                <TableHeader><TableRow><TableHead>Pegawai PK</TableHead><TableHead>Binaan</TableHead><TableHead>Sudah Lapor</TableHead><TableHead>Belum Lapor</TableHead><TableHead>% Kepatuhan</TableHead></TableRow></TableHeader>
+                <TableBody>
+                  {pegStats.map((p:any) => (
+                    <TableRow key={p.user_id}>
+                      <TableCell>{p.full_name}</TableCell>
+                      <TableCell>{p.binaan}</TableCell>
+                      <TableCell className="text-green-500">{p.lapor}</TableCell>
+                      <TableCell className="text-yellow-500">{p.belum}</TableCell>
+                      <TableCell>{p.binaan ? Math.round(p.lapor/p.binaan*100) : 0}%</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </TabsContent>
+        </Tabs>
       </div>
+    </div>
+  );
+}
+
+function StatCard({ icon: Icon, label, value, color }: any) {
+  return (
+    <div className="glass-card rounded-2xl p-5">
+      <Icon className={`w-6 h-6 ${color} mb-2`} />
+      <div className="text-3xl font-extrabold">{value}</div>
+      <div className="text-xs text-muted-foreground">{label}</div>
     </div>
   );
 }

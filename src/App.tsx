@@ -7,9 +7,7 @@ import { AuthProvider } from "@/lib/auth";
 import Navbar from "@/components/Navbar";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
-import Register from "./pages/Register";
-import Onboarding from "./pages/Onboarding";
-import KlienDashboard from "./pages/dashboard/KlienDashboard";
+import WajibLapor from "./pages/WajibLapor";
 import PegawaiDashboard from "./pages/dashboard/PegawaiDashboard";
 import AdminDashboard from "./pages/dashboard/AdminDashboard";
 import NotFound from "./pages/NotFound";
@@ -26,10 +24,8 @@ const App = () => (
           <Navbar />
           <Routes>
             <Route path="/" element={<Index />} />
+            <Route path="/wajib-lapor" element={<WajibLapor />} />
             <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Register />} />
-            <Route path="/onboarding" element={<Onboarding />} />
-            <Route path="/dashboard/klien" element={<KlienDashboard />} />
             <Route path="/dashboard/pegawai" element={<PegawaiDashboard />} />
             <Route path="/dashboard/admin" element={<AdminDashboard />} />
             <Route path="*" element={<NotFound />} />
