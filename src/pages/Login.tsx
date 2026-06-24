@@ -1,67 +1,54 @@
-import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { LogIn } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 
 export default function Login() {
+  const navigate = useNavigate();
+  const { user, role } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const navigate = useNavigate();
 
-  const handleLogin = async (e: React.FormEvent) => {
+  useEffect(() => {
+    if (user && role) {
+      navigate(role === 'admin' ? '/dashboard/admin' : '/dashboard/pegawai');
+    }
+  }, [user, role]);
+
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     setLoading(false);
-    if (error) {
-      toast.error(error.message);
-    } else {
-      // Role will be fetched by AuthProvider, redirect based on role
-      const { data: { user } } = await supabase.auth.getUser();
-      const { data } = await supabase.from('user_roles').select('role').eq('user_id', user!.id).maybeSingle();
-      if (data?.role === 'admin') {
-        navigate('/dashboard/admin');
-      } else if (data?.role === 'pegawai') {
-        navigate('/dashboard/pegawai');
-      } else {
-        navigate('/dashboard/klien');
-      }
-    }
+    if (error) { toast.error(error.message); return; }
+    toast.success('Berhasil masuk');
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 pt-20">
-      <div className="glass-card rounded-2xl p-8 w-full max-w-md glow-gold">
-        <div className="text-center mb-8">
-          <div className="w-12 h-12 rounded-full gradient-gold flex items-center justify-center font-bold text-primary-foreground mx-auto mb-4">SM</div>
-          <h1 className="text-2xl font-bold">Masuk ke SIMBOIS</h1>
-          <p className="text-sm text-muted-foreground mt-1 px-[13px]">Sistem Informasi Monitoring & Bimbingan Online Integrasi Sosial 
-          </p>
+    <div className="min-h-screen flex items-center justify-center px-4 pt-20 gradient-navy">
+      <div className="glass-card rounded-2xl p-8 w-full max-w-md">
+        <div className="text-center mb-6">
+          <img src="/favicon.svg" alt="SIMBOIS" className="w-14 h-14 mx-auto mb-3" />
+          <h1 className="text-2xl font-bold">Masuk Petugas</h1>
+          <p className="text-sm text-muted-foreground">Khusus Admin & Pegawai PK</p>
         </div>
-
-        <form onSubmit={handleLogin} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="email@contoh.com" required />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="password">Kata Sandi</Label>
-            <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" required />
-          </div>
-          <Button type="submit" className="w-full gap-2" disabled={loading}>
-            <LogIn className="w-4 h-4" /> {loading ? 'Memproses...' : 'Masuk'}
+        <form onSubmit={submit} className="space-y-4">
+          <div><Label>Email</Label><Input type="email" value={email} onChange={e=>setEmail(e.target.value)} required /></div>
+          <div><Label>Password</Label><Input type="password" value={password} onChange={e=>setPassword(e.target.value)} required /></div>
+          <Button type="submit" className="w-full" disabled={loading}>
+            {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}Masuk
           </Button>
         </form>
-
-        <p className="text-center text-sm text-muted-foreground mt-6">
-          Belum punya akun?{' '}
-          <Link to="/register" className="text-primary hover:underline">Daftar sekarang</Link>
+        <p className="text-xs text-center text-muted-foreground mt-6">
+          Klien tidak perlu login. <a href="/wajib-lapor" className="text-primary">Klik di sini untuk wajib lapor.</a>
         </p>
       </div>
-    </div>);
+    </div>
+  );
 }
