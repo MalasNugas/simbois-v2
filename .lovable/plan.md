@@ -1,25 +1,33 @@
-# Fix Import: Auto-create Template Tab + Pesan Error Lebih Jelas
+## Pre-check akses Editor sebelum tombol "Buat Template Tab" & "Tarik dari Sheet" aktif
 
-## Penyebab error
+### Masalah
+Connector Google saat ini hanya punya akses Viewer/Commenter ke spreadsheet target, sehingga `batchUpdate` (membuat tab) dan `values.update` (menulis header / pull yang butuh tulis) gagal dengan **403 PERMISSION_DENIED**. User baru tahu setelah klik tombol dan menunggu error.
 
-Error `400: Unable to parse range: 'Pegawai PK Import'` artinya **tab tersebut belum ada** di spreadsheet Anda. Sistem berusaha membaca tab yang belum dibuat.
+### Solusi
+Tambahkan probe akses ringan saat user klik **Test Koneksi**. Jika akun connector bukan Editor, tombol aksi tulis di-disable dan ditampilkan instruksi share sebagai Editor.
 
-Saat ini saya hanya menampilkan instruksi kolom di UI, tapi tidak membuat tab-nya. User harus buat manual — itu yang menyebabkan error.
+### Perubahan
 
-## Solusi
+**1. Edge function baru: `supabase/functions/sheets-check-access/index.ts`**
+- Admin-only, input: `{ spreadsheet_id }`.
+- Cara cek (tanpa mengubah data): panggil `spreadsheets/{id}?fields=spreadsheetId,properties.title` lalu `spreadsheets:batchUpdate` dengan body kosong `{ requests: [] }`.
+  - Google membalas 200 jika punya akses tulis, 403 jika hanya read.
+- Return: `{ can_write: boolean, reason?: string, connector_email?: string }`.
+  - Untuk `connector_email`, coba ambil dari `oauth2/v2/userinfo` via gateway (best-effort, boleh kosong).
 
-**Tambah tombol "Buat Template Tab"** di panel Import. Saat diklik:
-- Auto-create 3 tab di spreadsheet: `Pegawai PK Import`, `Clients Import`, `Wajib Lapor Import` (kalau belum ada).
-- Isi baris pertama dengan header kolom yang benar.
-- User tinggal isi data di Google Sheets, lalu klik "Tarik dari Sheet".
+**2. Update `supabase/functions/sheets-test-connection/index.ts`**
+- Setelah berhasil ambil metadata, panggil probe write yang sama (`batchUpdate` body kosong) dan kembalikan `can_write` di response.
 
-Juga **perbaiki pesan error** di edge function `sheets-sync-pull`: kalau tab tidak ditemukan (400), tampilkan pesan ramah: *"Tab 'X' belum ada. Klik 'Buat Template Tab' dulu."*
+**3. Update `src/pages/dashboard/IntegrasiSpreadsheet.tsx`**
+- State baru: `canWrite: boolean | null`, `connectorEmail: string | null`.
+- `handleTest()` simpan `can_write` dari response.
+- Disable tombol **Buat Template Tab**, **Tarik dari Sheet**, dan **Push ke Sheet** saat `canWrite === false`.
+- Tampilkan banner peringatan merah di panel ketika `canWrite === false`:
+  > "Akun connector Google belum punya akses **Editor** ke spreadsheet ini. Buka spreadsheet → Share → tambahkan email connector sebagai **Editor**, lalu klik **Test Koneksi** lagi."
+  > (Jika `connectorEmail` tersedia, tampilkan emailnya + tombol copy.)
+- Banner hijau singkat saat `canWrite === true`.
 
-## File yang diubah
-
-- **Baru** `supabase/functions/sheets-create-import-tabs/index.ts` — admin-only, panggil `batchUpdate` untuk addSheet + tulis headers via `values:update`. Idempoten (skip kalau tab sudah ada).
-- **Diubah** `supabase/functions/sheets-sync-pull/index.ts` — deteksi error 400 "Unable to parse range" dan ganti dengan pesan "Tab belum ada".
-- **Diubah** `src/pages/dashboard/IntegrasiSpreadsheet.tsx` — tambah tombol "Buat Template Tab" di samping tombol "Tarik dari Sheet".
-
-## Tidak diubah
-- Skema DB, RLS, atau tabel lain.
+### Yang TIDAK berubah
+- Tidak ada perubahan DB / RLS / tabel.
+- Logic push/pull/template tetap sama; hanya gating UI + probe.
+- Tetap pertahankan error handling 403 di edge function existing sebagai jaring pengaman.

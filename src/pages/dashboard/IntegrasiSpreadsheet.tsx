@@ -39,6 +39,9 @@ export default function IntegrasiSpreadsheet() {
   const [pullResult, setPullResult] = useState<any>(null);
   const [pullOpts, setPullOpts] = useState({ pegawai: true, clients: true, reports: false });
   const [tabsLoading, setTabsLoading] = useState(false);
+  const [canWrite, setCanWrite] = useState<boolean | null>(null);
+  const [writeError, setWriteError] = useState<string | null>(null);
+
 
 
 
@@ -91,15 +94,25 @@ export default function IntegrasiSpreadsheet() {
     const id = extractSpreadsheetId(urlInput);
     if (!id) { toast.error('URL/ID spreadsheet kosong'); return; }
     setTesting(true);
+    setCanWrite(null);
+    setWriteError(null);
     const { data, error } = await supabase.functions.invoke('sheets-test-connection', { body: { spreadsheet_id: id } });
     setTesting(false);
     if (error || !(data as any)?.ok) {
       toast.error((data as any)?.error || error?.message || 'Koneksi gagal');
       return;
     }
-    toast.success(`Terhubung: ${(data as any).title} (${(data as any).sheet_count} tab)`);
+    const d = data as any;
+    setCanWrite(!!d.can_write);
+    setWriteError(d.write_error || null);
+    if (d.can_write) {
+      toast.success(`Terhubung sebagai Editor: ${d.title} (${d.sheet_count} tab)`);
+    } else {
+      toast.warning(`Terhubung tapi BUKAN Editor: ${d.title}. Share sebagai Editor dulu.`);
+    }
     await fetchTabs(id);
   };
+
 
   const handleSave = async () => {
     const spreadsheet_id = extractSpreadsheetId(urlInput);
@@ -246,7 +259,25 @@ export default function IntegrasiSpreadsheet() {
               </a>
             )}
           </div>
+
+          {canWrite === false && (
+            <div className="flex items-start gap-2 p-3 rounded-lg bg-destructive/10 border border-destructive/40 text-xs">
+              <AlertTriangle className="w-4 h-4 text-destructive shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                <p className="font-semibold text-destructive">Akun connector Google belum punya akses Editor.</p>
+                <p>Buka spreadsheet di Google Sheets → klik <strong>Share</strong> → tambahkan email akun Google yang dipakai connector (lihat di Lovable → Connectors → Google Sheets) sebagai <strong>Editor</strong>, lalu klik <strong>Test & Muat Tab</strong> lagi.</p>
+                <p className="text-muted-foreground">Tombol Push, Tarik dari Sheet, dan Buat Template Tab di-nonaktifkan sampai akses Editor diberikan.</p>
+                {writeError && <p className="text-muted-foreground break-all">Detail: {writeError}</p>}
+              </div>
+            </div>
+          )}
+          {canWrite === true && (
+            <div className="text-xs p-2 rounded-lg bg-green-500/10 border border-green-500/30 text-green-700 dark:text-green-400">
+              ✓ Akses Editor terverifikasi — semua aksi tersedia.
+            </div>
+          )}
         </div>
+
 
         {/* Tabs yang akan dibuat otomatis */}
         <div className="glass-card rounded-2xl p-6 space-y-3">
@@ -294,9 +325,10 @@ export default function IntegrasiSpreadsheet() {
             <Button onClick={handleSave} disabled={saving} className="gap-2">
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Simpan Pengaturan
             </Button>
-            <Button onClick={handlePush} disabled={syncing || !settings?.id} variant="secondary" className="gap-2">
+            <Button onClick={handlePush} disabled={syncing || !settings?.id || canWrite === false} variant="secondary" className="gap-2">
               {syncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />} Push Sekarang
             </Button>
+
           </div>
         </div>
 
@@ -336,12 +368,13 @@ export default function IntegrasiSpreadsheet() {
             ))}
           </div>
           <div className="flex gap-2 flex-wrap">
-            <Button onClick={handleCreateTemplate} disabled={creatingTabs || !settings?.id} variant="outline" className="gap-2">
+            <Button onClick={handleCreateTemplate} disabled={creatingTabs || !settings?.id || canWrite === false} variant="outline" className="gap-2">
               {creatingTabs ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />} Buat Template Tab
             </Button>
-            <Button onClick={handlePull} disabled={pulling || !settings?.id} variant="secondary" className="gap-2">
+            <Button onClick={handlePull} disabled={pulling || !settings?.id || canWrite === false} variant="secondary" className="gap-2">
               {pulling ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />} Tarik dari Sheet
             </Button>
+
           </div>
 
           {pullResult && (
