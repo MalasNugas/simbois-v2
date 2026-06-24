@@ -1,26 +1,25 @@
-# Cakupan Input — Konfirmasi & Klarifikasi
+# Fix Import: Auto-create Template Tab + Pesan Error Lebih Jelas
 
-Berdasarkan jawaban Anda: **"Klien via website + via Sheet"** (Pegawai PK juga via keduanya).
+## Penyebab error
 
-## Status saat ini (sudah sesuai pilihan Anda)
+Error `400: Unable to parse range: 'Pegawai PK Import'` artinya **tab tersebut belum ada** di spreadsheet Anda. Sistem berusaha membaca tab yang belum dibuat.
 
-| Entitas | Via Website | Via Spreadsheet Import |
-|---|---|---|
-| **Klien** | ✅ Form "Tambah Klien" di Dashboard Admin | ✅ Tab `Clients Import` |
-| **Pegawai PK** | ✅ Form "Tambah Pegawai" di Dashboard Admin | ✅ Tab `Pegawai PK Import` |
-| **Wajib Lapor** | ✅ Klien isi sendiri di halaman Wajib Lapor | ✅ Tab `Wajib Lapor Import` (opsional) |
-| **Izin Lapor** | ✅ Pegawai PK beri izin di app | ❌ Tidak diimport |
+Saat ini saya hanya menampilkan instruksi kolom di UI, tapi tidak membuat tab-nya. User harus buat manual — itu yang menyebabkan error.
 
-→ **Tidak ada perubahan kode yang dibutuhkan.** Kedua jalur sudah aktif.
+## Solusi
 
-## Catatan penting
+**Tambah tombol "Buat Template Tab"** di panel Import. Saat diklik:
+- Auto-create 3 tab di spreadsheet: `Pegawai PK Import`, `Clients Import`, `Wajib Lapor Import` (kalau belum ada).
+- Isi baris pertama dengan header kolom yang benar.
+- User tinggal isi data di Google Sheets, lalu klik "Tarik dari Sheet".
 
-Saat ini "Klien via website" = **Admin** yang mendaftarkan Klien lewat form di Dashboard Admin. **Belum ada halaman registrasi mandiri** di mana Klien bisa daftar sendiri tanpa Admin.
+Juga **perbaiki pesan error** di edge function `sheets-sync-pull`: kalau tab tidak ditemukan (400), tampilkan pesan ramah: *"Tab 'X' belum ada. Klik 'Buat Template Tab' dulu."*
 
-## Pertanyaan lanjutan
+## File yang diubah
 
-Apakah Anda ingin saya tambahkan **halaman registrasi mandiri untuk Klien** (`/register-klien`) supaya Klien bisa daftar sendiri tanpa harus dibuatkan Admin? Form akan minta: Nama, Email, Password, No. Litmas, Telepon, Pegawai PK pilihan. Akun yang dibuat menunggu verifikasi Admin sebelum bisa lapor.
+- **Baru** `supabase/functions/sheets-create-import-tabs/index.ts` — admin-only, panggil `batchUpdate` untuk addSheet + tulis headers via `values:update`. Idempoten (skip kalau tab sudah ada).
+- **Diubah** `supabase/functions/sheets-sync-pull/index.ts` — deteksi error 400 "Unable to parse range" dan ganti dengan pesan "Tab belum ada".
+- **Diubah** `src/pages/dashboard/IntegrasiSpreadsheet.tsx` — tambah tombol "Buat Template Tab" di samping tombol "Tarik dari Sheet".
 
-Pilih salah satu:
-- **A. Cukup seperti sekarang** — Admin yang membuat akun Klien (via form atau Sheet). Tidak ada perubahan.
-- **B. Tambahkan halaman Self-Register Klien** — Klien bisa daftar sendiri, Admin verifikasi.
+## Tidak diubah
+- Skema DB, RLS, atau tabel lain.
