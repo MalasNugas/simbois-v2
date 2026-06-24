@@ -97,15 +97,20 @@ Deno.serve(async (req) => {
     // ---------- 2. Wajib Lapor ----------
     const reportsTab: TabSpec = {
       name: settings.reports_sheet_name || "Wajib Lapor",
-      headers: ["No. Litmas","Nama Klien","Periode","Tanggal Lapor","Status Pekerjaan","Status Operasional","Latitude","Longitude","Status Lokasi","Metode","Catatan","URL Selfie"],
+      headers: ["No. Litmas","Nama Klien","Pegawai PK","Periode","Tanggal Lapor","Hari Ke-","Status Pekerjaan","Status Operasional","Latitude","Longitude","Status Lokasi","Metode","Catatan","URL Selfie"],
       rows: (reports || []).map((r: any) => {
         const cli = cmap.get(r.client_id);
         const pname = cli ? pmap.get(cli.user_id)?.full_name || "" : "";
+        const pk = cli?.assigned_pk_id ? pmap.get(cli.assigned_pk_id)?.full_name || "" : "Belum ditugaskan";
+        const reportDate = r.report_date || r.created_at;
+        const dayOfMonth = reportDate ? new Date(reportDate).getDate() : "";
         return [
           cli?.case_number || "",
           pname,
+          pk,
           `${BULAN[r.report_month] || r.report_month} ${r.report_year}`,
-          fmtDate(r.report_date || r.created_at),
+          fmtDate(reportDate),
+          dayOfMonth,
           r.job_status || "",
           r.operational_status || "",
           r.lat ?? "",
@@ -117,6 +122,7 @@ Deno.serve(async (req) => {
         ];
       }),
     };
+
 
     // ---------- 3. Izin Lapor ----------
     const permsTab: TabSpec = {
