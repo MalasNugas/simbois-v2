@@ -39,6 +39,9 @@ export default function IntegrasiSpreadsheet() {
   const [pullResult, setPullResult] = useState<any>(null);
   const [pullOpts, setPullOpts] = useState({ pegawai: true, clients: true, reports: false });
   const [tabsLoading, setTabsLoading] = useState(false);
+  const [canWrite, setCanWrite] = useState<boolean | null>(null);
+  const [writeError, setWriteError] = useState<string | null>(null);
+
 
 
 
@@ -91,15 +94,25 @@ export default function IntegrasiSpreadsheet() {
     const id = extractSpreadsheetId(urlInput);
     if (!id) { toast.error('URL/ID spreadsheet kosong'); return; }
     setTesting(true);
+    setCanWrite(null);
+    setWriteError(null);
     const { data, error } = await supabase.functions.invoke('sheets-test-connection', { body: { spreadsheet_id: id } });
     setTesting(false);
     if (error || !(data as any)?.ok) {
       toast.error((data as any)?.error || error?.message || 'Koneksi gagal');
       return;
     }
-    toast.success(`Terhubung: ${(data as any).title} (${(data as any).sheet_count} tab)`);
+    const d = data as any;
+    setCanWrite(!!d.can_write);
+    setWriteError(d.write_error || null);
+    if (d.can_write) {
+      toast.success(`Terhubung sebagai Editor: ${d.title} (${d.sheet_count} tab)`);
+    } else {
+      toast.warning(`Terhubung tapi BUKAN Editor: ${d.title}. Share sebagai Editor dulu.`);
+    }
     await fetchTabs(id);
   };
+
 
   const handleSave = async () => {
     const spreadsheet_id = extractSpreadsheetId(urlInput);
