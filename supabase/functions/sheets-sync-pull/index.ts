@@ -164,7 +164,7 @@ Deno.serve(async (req) => {
               if (cErr || !created.user) { r.errors.push(`Baris ${i + 2} (${case_number}): ${cErr?.message}`); continue; }
               userId = created.user.id;
             }
-            await admin.from("user_roles").upsert({ user_id: userId, role: "client" }, { onConflict: "user_id,role" });
+            await admin.from("user_roles").upsert({ user_id: userId, role: "klien" }, { onConflict: "user_id,role" });
             await admin.from("profiles").update(profilePatch).eq("user_id", userId);
             await admin.from("clients").insert({ ...clientPatch, user_id: userId });
             r.created++;
