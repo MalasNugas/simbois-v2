@@ -62,7 +62,7 @@ export default function IntegrasiSpreadsheet() {
       setClientsTab(data.clients_sheet_name);
       setReportsTab(data.reports_sheet_name);
       setPermsTab(data.permissions_sheet_name);
-      setMapping(data.column_mapping || { clients: {}, reports: {}, permissions: {} });
+      setMapping((data.column_mapping as any) || { clients: {}, reports: {}, permissions: {} });
       setAutoSync(data.auto_sync);
       await fetchTabs(data.spreadsheet_id);
     }
