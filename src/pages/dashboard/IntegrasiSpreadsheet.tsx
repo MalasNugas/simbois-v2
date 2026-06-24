@@ -192,75 +192,29 @@ export default function IntegrasiSpreadsheet() {
           </div>
         </div>
 
-        {/* Tab selection */}
-        <div className="glass-card rounded-2xl p-6 space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="font-semibold">Pemilihan Tab</h2>
-            {tabsLoading && <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />}
-          </div>
-          {tabs.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Klik "Test & Muat Tab" untuk menampilkan daftar tab.</p>
-          ) : (
-            <div className="grid md:grid-cols-3 gap-4">
-              {[
-                { label: 'Tab Clients', value: clientsTab, set: setClientsTab },
-                { label: 'Tab WajibLapor', value: reportsTab, set: setReportsTab },
-                { label: 'Tab Permissions', value: permsTab, set: setPermsTab },
-              ].map((f) => (
-                <div key={f.label} className="space-y-1">
-                  <Label>{f.label}</Label>
-                  <Select value={f.value} onValueChange={f.set}>
-                    <SelectTrigger><SelectValue placeholder="Pilih tab" /></SelectTrigger>
-                    <SelectContent>
-                      {tabs.map((t) => <SelectItem key={t.title} value={t.title}>{t.title}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-              ))}
-            </div>
-          )}
+        {/* Tabs yang akan dibuat otomatis */}
+        <div className="glass-card rounded-2xl p-6 space-y-3">
+          <h2 className="font-semibold">Struktur Data (6 Tab Otomatis)</h2>
+          <p className="text-sm text-muted-foreground">
+            Saat "Push Sekarang" ditekan, sistem otomatis membuat tab berikut di spreadsheet bila belum ada,
+            dan mengisinya dengan data terkini. Header sudah dalam Bahasa Indonesia.
+          </p>
+          <ul className="grid sm:grid-cols-2 gap-2 text-sm">
+            {[
+              { name: 'Clients', desc: 'Data lengkap klien + Pegawai PK yang ditugaskan' },
+              { name: 'Wajib Lapor', desc: 'Riwayat lapor bulanan + status lokasi geofencing' },
+              { name: 'Izin Lapor', desc: 'Izin lapor yang diberikan Pegawai PK' },
+              { name: 'Pegawai PK', desc: 'Daftar pegawai + jumlah klien & laporan bulan ini' },
+              { name: 'Rekap Bulanan', desc: 'Agregasi 12 bulan terakhir' },
+              { name: 'Tracking Lokasi', desc: '1000 titik GPS terbaru (geofencing Malang)' },
+            ].map((t) => (
+              <li key={t.name} className="flex gap-2 p-2 rounded-lg bg-muted/30">
+                <Badge variant="outline" className="shrink-0">{t.name}</Badge>
+                <span className="text-xs text-muted-foreground">{t.desc}</span>
+              </li>
+            ))}
+          </ul>
         </div>
-
-        {/* Column mapping */}
-        {tabs.length > 0 && (
-          <div className="glass-card rounded-2xl p-6 space-y-6">
-            <h2 className="font-semibold">Mapping Kolom</h2>
-            <p className="text-xs text-muted-foreground -mt-3">Kosongkan untuk pakai nama field DB sebagai header default.</p>
-            {(['clients', 'reports', 'permissions'] as const).map((group) => {
-              const tabName = group === 'clients' ? clientsTab : group === 'reports' ? reportsTab : permsTab;
-              const headers = headersFor(tabName);
-              return (
-                <div key={group}>
-                  <h3 className="text-sm font-semibold mb-2 capitalize">{group} <span className="text-muted-foreground font-normal">({tabName || '—'})</span></h3>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Field DB</TableHead>
-                        <TableHead>Header Sheet</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {DB_FIELDS[group].map((f) => (
-                        <TableRow key={f}>
-                          <TableCell className="font-mono text-xs">{f}</TableCell>
-                          <TableCell>
-                            <Select value={mapping[group]?.[f] || '__none__'} onValueChange={(v) => updateMap(group, f, v)}>
-                              <SelectTrigger className="h-8"><SelectValue placeholder="Default" /></SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="__none__">Default ({f})</SelectItem>
-                                {headers.map((h, i) => <SelectItem key={`${h}-${i}`} value={h}>{h}</SelectItem>)}
-                              </SelectContent>
-                            </Select>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              );
-            })}
-          </div>
-        )}
 
         {/* Sync controls */}
         <div className="glass-card rounded-2xl p-6 space-y-4">
