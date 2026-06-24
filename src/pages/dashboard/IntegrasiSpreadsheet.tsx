@@ -259,7 +259,25 @@ export default function IntegrasiSpreadsheet() {
               </a>
             )}
           </div>
+
+          {canWrite === false && (
+            <div className="flex items-start gap-2 p-3 rounded-lg bg-destructive/10 border border-destructive/40 text-xs">
+              <AlertTriangle className="w-4 h-4 text-destructive shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                <p className="font-semibold text-destructive">Akun connector Google belum punya akses Editor.</p>
+                <p>Buka spreadsheet di Google Sheets → klik <strong>Share</strong> → tambahkan email akun Google yang dipakai connector (lihat di Lovable → Connectors → Google Sheets) sebagai <strong>Editor</strong>, lalu klik <strong>Test & Muat Tab</strong> lagi.</p>
+                <p className="text-muted-foreground">Tombol Push, Tarik dari Sheet, dan Buat Template Tab di-nonaktifkan sampai akses Editor diberikan.</p>
+                {writeError && <p className="text-muted-foreground break-all">Detail: {writeError}</p>}
+              </div>
+            </div>
+          )}
+          {canWrite === true && (
+            <div className="text-xs p-2 rounded-lg bg-green-500/10 border border-green-500/30 text-green-700 dark:text-green-400">
+              ✓ Akses Editor terverifikasi — semua aksi tersedia.
+            </div>
+          )}
         </div>
+
 
         {/* Tabs yang akan dibuat otomatis */}
         <div className="glass-card rounded-2xl p-6 space-y-3">
