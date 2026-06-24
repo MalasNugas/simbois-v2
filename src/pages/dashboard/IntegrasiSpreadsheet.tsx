@@ -139,17 +139,32 @@ export default function IntegrasiSpreadsheet() {
     await load();
   };
 
+  const extractFnError = async (error: any, data: any) => {
+    if (data?.error) return data.error;
+    try {
+      const body = await error?.context?.json?.();
+      if (body?.error) return body.error;
+    } catch { /* ignore */ }
+    try {
+      const txt = await error?.context?.text?.();
+      if (txt) return txt;
+    } catch { /* ignore */ }
+    return error?.message || 'Terjadi kesalahan';
+  };
+
   const handleCreateTemplate = async () => {
     if (!settings?.id) { toast.error('Simpan pengaturan dulu'); return; }
     setCreatingTabs(true);
     const { data, error } = await supabase.functions.invoke('sheets-create-import-tabs', { body: {} });
     setCreatingTabs(false);
     if (error || (data as any)?.error) {
-      toast.error((data as any)?.error || error?.message || 'Gagal membuat template');
+      toast.error(await extractFnError(error, data));
     } else {
       toast.success('Template tab berhasil dibuat di spreadsheet');
     }
   };
+
+
 
   const handlePull = async () => {
 
