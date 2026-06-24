@@ -137,6 +137,28 @@ export default function IntegrasiSpreadsheet() {
     await load();
   };
 
+  const handlePull = async () => {
+    if (!settings?.id) { toast.error('Simpan pengaturan dulu'); return; }
+    if (!pullOpts.pegawai && !pullOpts.clients && !pullOpts.reports) {
+      toast.error('Pilih minimal satu tab untuk di-import'); return;
+    }
+    const ok = window.confirm(
+      'Import akan membuat akun login dari Spreadsheet.\n\nPastikan tab dan kolom (Email, Password Awal, No. Litmas) sudah benar.\n\nLanjutkan?'
+    );
+    if (!ok) return;
+    setPulling(true);
+    setPullResult(null);
+    const { data, error } = await supabase.functions.invoke('sheets-sync-pull', { body: pullOpts });
+    setPulling(false);
+    if (error || (data as any)?.error) {
+      toast.error((data as any)?.error || error?.message || 'Import gagal');
+    } else {
+      setPullResult((data as any).results);
+      toast.success('Import selesai — periksa ringkasan di bawah');
+    }
+  };
+
+
   const updateMap = (group: keyof typeof DB_FIELDS, field: string, header: string) => {
     setMapping((m) => ({ ...m, [group]: { ...(m[group] || {}), [field]: header === '__none__' ? '' : header } }));
   };
