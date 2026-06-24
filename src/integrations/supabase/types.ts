@@ -14,33 +14,6 @@ export type Database = {
   }
   public: {
     Tables: {
-      chat_messages: {
-        Row: {
-          created_at: string | null
-          id: string
-          is_read: boolean | null
-          message: string
-          receiver_id: string
-          sender_id: string
-        }
-        Insert: {
-          created_at?: string | null
-          id?: string
-          is_read?: boolean | null
-          message: string
-          receiver_id: string
-          sender_id: string
-        }
-        Update: {
-          created_at?: string | null
-          id?: string
-          is_read?: boolean | null
-          message?: string
-          receiver_id?: string
-          sender_id?: string
-        }
-        Relationships: []
-      }
       clients: {
         Row: {
           assigned_pk_id: string | null
@@ -134,28 +107,49 @@ export type Database = {
           client_id: string
           created_at: string | null
           id: string
+          job_status: string | null
+          lat: number | null
+          lng: number | null
           notes: string | null
+          operational_status: string | null
+          permission_id: string | null
           report_date: string
           report_month: number
           report_year: number
+          selfie_url: string | null
+          submitted_via: string | null
         }
         Insert: {
           client_id: string
           created_at?: string | null
           id?: string
+          job_status?: string | null
+          lat?: number | null
+          lng?: number | null
           notes?: string | null
+          operational_status?: string | null
+          permission_id?: string | null
           report_date?: string
           report_month: number
           report_year: number
+          selfie_url?: string | null
+          submitted_via?: string | null
         }
         Update: {
           client_id?: string
           created_at?: string | null
           id?: string
+          job_status?: string | null
+          lat?: number | null
+          lng?: number | null
           notes?: string | null
+          operational_status?: string | null
+          permission_id?: string | null
           report_date?: string
           report_month?: number
           report_year?: number
+          selfie_url?: string | null
+          submitted_via?: string | null
         }
         Relationships: []
       }
@@ -234,127 +228,55 @@ export type Database = {
         }
         Relationships: []
       }
-      program_registrations: {
+      reporting_permissions: {
         Row: {
           client_id: string
-          created_at: string | null
+          created_at: string
+          granted_at: string
           id: string
-          program_id: string
-          reviewed_at: string | null
-          reviewed_by: string | null
-          status: Database["public"]["Enums"]["registration_status"] | null
+          note: string | null
+          pegawai_id: string
+          period_month: number
+          period_year: number
+          revoked_at: string | null
+          updated_at: string
+          used_at: string | null
         }
         Insert: {
           client_id: string
-          created_at?: string | null
+          created_at?: string
+          granted_at?: string
           id?: string
-          program_id: string
-          reviewed_at?: string | null
-          reviewed_by?: string | null
-          status?: Database["public"]["Enums"]["registration_status"] | null
+          note?: string | null
+          pegawai_id: string
+          period_month: number
+          period_year: number
+          revoked_at?: string | null
+          updated_at?: string
+          used_at?: string | null
         }
         Update: {
           client_id?: string
-          created_at?: string | null
+          created_at?: string
+          granted_at?: string
           id?: string
-          program_id?: string
-          reviewed_at?: string | null
-          reviewed_by?: string | null
-          status?: Database["public"]["Enums"]["registration_status"] | null
+          note?: string | null
+          pegawai_id?: string
+          period_month?: number
+          period_year?: number
+          revoked_at?: string | null
+          updated_at?: string
+          used_at?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "program_registrations_program_id_fkey"
-            columns: ["program_id"]
+            foreignKeyName: "reporting_permissions_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: "programs"
+            referencedRelation: "clients"
             referencedColumns: ["id"]
           },
         ]
-      }
-      programs: {
-        Row: {
-          created_at: string | null
-          created_by: string | null
-          description: string | null
-          file_url: string | null
-          id: string
-          is_open: boolean | null
-          name: string
-          program_type: string
-          quota: number | null
-          schedule_date: string | null
-          schedule_end: string | null
-          trainer_info: string | null
-          trainer_name: string | null
-          updated_at: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          created_by?: string | null
-          description?: string | null
-          file_url?: string | null
-          id?: string
-          is_open?: boolean | null
-          name: string
-          program_type: string
-          quota?: number | null
-          schedule_date?: string | null
-          schedule_end?: string | null
-          trainer_info?: string | null
-          trainer_name?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          created_by?: string | null
-          description?: string | null
-          file_url?: string | null
-          id?: string
-          is_open?: boolean | null
-          name?: string
-          program_type?: string
-          quota?: number | null
-          schedule_date?: string | null
-          schedule_end?: string | null
-          trainer_info?: string | null
-          trainer_name?: string | null
-          updated_at?: string | null
-        }
-        Relationships: []
-      }
-      termination_reports: {
-        Row: {
-          approval_status: string
-          client_id: string
-          created_at: string | null
-          file_url: string | null
-          id: string
-          notes: string | null
-          pegawai_id: string
-          report_date: string
-        }
-        Insert: {
-          approval_status?: string
-          client_id: string
-          created_at?: string | null
-          file_url?: string | null
-          id?: string
-          notes?: string | null
-          pegawai_id: string
-          report_date?: string
-        }
-        Update: {
-          approval_status?: string
-          client_id?: string
-          created_at?: string | null
-          file_url?: string | null
-          id?: string
-          notes?: string | null
-          pegawai_id?: string
-          report_date?: string
-        }
-        Relationships: []
       }
       user_roles: {
         Row: {
@@ -379,6 +301,20 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_client_permission_status: {
+        Args: { _client_id: string }
+        Returns: {
+          already_reported: boolean
+          assigned_pk_name: string
+          case_number: string
+          client_id: string
+          full_name: string
+          has_permission: boolean
+          period_month: number
+          period_year: number
+          permission_id: string
+        }[]
+      }
       get_pegawai_list: {
         Args: never
         Returns: {
@@ -392,6 +328,16 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      has_role_any: { Args: { _user_id: string }; Returns: string }
+      search_clients_public: {
+        Args: { _q: string }
+        Returns: {
+          assigned_pk_name: string
+          case_number: string
+          full_name: string
+          id: string
+        }[]
       }
     }
     Enums: {
