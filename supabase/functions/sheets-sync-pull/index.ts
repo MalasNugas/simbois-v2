@@ -5,7 +5,16 @@ type Row = Record<string, string>;
 
 async function readTab(spreadsheet_id: string, tab: string): Promise<Row[]> {
   const quoted = `'${tab.replace(/'/g, "''")}'`;
-  const res = await gatewayFetch(`/spreadsheets/${spreadsheet_id}/values/${quoted}`);
+  let res: any;
+  try {
+    res = await gatewayFetch(`/spreadsheets/${spreadsheet_id}/values/${quoted}`);
+  } catch (e) {
+    const msg = (e as Error).message || "";
+    if (msg.includes("Unable to parse range") || msg.includes("400")) {
+      throw new Error(`Tab "${tab}" belum ada di spreadsheet. Klik "Buat Template Tab" terlebih dahulu.`);
+    }
+    throw e;
+  }
   const values: string[][] = res?.values || [];
   if (values.length < 2) return [];
   const headers = values[0].map((h) => String(h || "").trim());
@@ -15,6 +24,7 @@ async function readTab(spreadsheet_id: string, tab: string): Promise<Row[]> {
     return o;
   }).filter((r) => Object.values(r).some((v) => v !== ""));
 }
+
 
 const parseDate = (s?: string) => {
   if (!s) return null;

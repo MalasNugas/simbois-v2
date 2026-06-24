@@ -35,9 +35,11 @@ export default function IntegrasiSpreadsheet() {
   const [testing, setTesting] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [pulling, setPulling] = useState(false);
+  const [creatingTabs, setCreatingTabs] = useState(false);
   const [pullResult, setPullResult] = useState<any>(null);
   const [pullOpts, setPullOpts] = useState({ pegawai: true, clients: true, reports: false });
   const [tabsLoading, setTabsLoading] = useState(false);
+
 
 
   const [settings, setSettings] = useState<any>(null);
@@ -137,7 +139,20 @@ export default function IntegrasiSpreadsheet() {
     await load();
   };
 
+  const handleCreateTemplate = async () => {
+    if (!settings?.id) { toast.error('Simpan pengaturan dulu'); return; }
+    setCreatingTabs(true);
+    const { data, error } = await supabase.functions.invoke('sheets-create-import-tabs', { body: {} });
+    setCreatingTabs(false);
+    if (error || (data as any)?.error) {
+      toast.error((data as any)?.error || error?.message || 'Gagal membuat template');
+    } else {
+      toast.success('Template tab berhasil dibuat di spreadsheet');
+    }
+  };
+
   const handlePull = async () => {
+
     if (!settings?.id) { toast.error('Simpan pengaturan dulu'); return; }
     if (!pullOpts.pegawai && !pullOpts.clients && !pullOpts.reports) {
       toast.error('Pilih minimal satu tab untuk di-import'); return;
@@ -305,9 +320,15 @@ export default function IntegrasiSpreadsheet() {
               </label>
             ))}
           </div>
-          <Button onClick={handlePull} disabled={pulling || !settings?.id} variant="secondary" className="gap-2">
-            {pulling ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />} Tarik dari Sheet
-          </Button>
+          <div className="flex gap-2 flex-wrap">
+            <Button onClick={handleCreateTemplate} disabled={creatingTabs || !settings?.id} variant="outline" className="gap-2">
+              {creatingTabs ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />} Buat Template Tab
+            </Button>
+            <Button onClick={handlePull} disabled={pulling || !settings?.id} variant="secondary" className="gap-2">
+              {pulling ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />} Tarik dari Sheet
+            </Button>
+          </div>
+
           {pullResult && (
             <div className="space-y-2 text-sm">
               <p className="font-semibold">Ringkasan Import:</p>
