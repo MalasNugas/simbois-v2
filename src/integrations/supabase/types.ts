@@ -278,6 +278,57 @@ export type Database = {
           },
         ]
       }
+      sheet_integration_settings: {
+        Row: {
+          auto_sync: boolean
+          clients_sheet_name: string
+          column_mapping: Json
+          created_at: string
+          created_by: string | null
+          id: string
+          last_sync_at: string | null
+          last_sync_error: string | null
+          last_sync_status: string | null
+          permissions_sheet_name: string
+          reports_sheet_name: string
+          spreadsheet_id: string
+          spreadsheet_url: string | null
+          updated_at: string
+        }
+        Insert: {
+          auto_sync?: boolean
+          clients_sheet_name?: string
+          column_mapping?: Json
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          last_sync_at?: string | null
+          last_sync_error?: string | null
+          last_sync_status?: string | null
+          permissions_sheet_name?: string
+          reports_sheet_name?: string
+          spreadsheet_id: string
+          spreadsheet_url?: string | null
+          updated_at?: string
+        }
+        Update: {
+          auto_sync?: boolean
+          clients_sheet_name?: string
+          column_mapping?: Json
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          last_sync_at?: string | null
+          last_sync_error?: string | null
+          last_sync_status?: string | null
+          permissions_sheet_name?: string
+          reports_sheet_name?: string
+          spreadsheet_id?: string
+          spreadsheet_url?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           id: string

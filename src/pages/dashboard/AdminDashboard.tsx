@@ -160,7 +160,10 @@ export default function AdminDashboard() {
             <h1 className="text-3xl font-bold">Dashboard Admin</h1>
             <p className="text-muted-foreground">Periode: {MONTHS[curMonth-1]} {curYear}</p>
           </div>
-          <Button variant="outline" onClick={exportCSV} className="gap-2"><Download className="w-4 h-4" /> Export CSV</Button>
+          <div className="flex gap-2 flex-wrap">
+            <Button variant="outline" onClick={() => navigate('/admin/integrasi-spreadsheet')} className="gap-2">Integrasi Spreadsheet</Button>
+            <Button variant="outline" onClick={exportCSV} className="gap-2"><Download className="w-4 h-4" /> Export CSV</Button>
+          </div>
         </motion.div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
