@@ -153,26 +153,36 @@ Deno.serve(async (req) => {
     const thisYear = now.getFullYear();
     const pegawaiTab: TabSpec = {
       name: "Pegawai PK",
-      headers: ["Nama Pegawai","Telepon","Jumlah Klien Aktif","Jumlah Klien Selesai","Laporan Bulan Ini","Bergabung Sejak"],
+      headers: ["Nama Pegawai","Telepon","Jumlah Klien Aktif","Jumlah Klien Selesai","Klien Sudah Lapor Bln Ini","Klien Belum Lapor Bln Ini","Laporan Bulan Ini","Bergabung Sejak"],
       rows: (profiles || [])
         .filter((p: any) => pegawaiIds.has(p.user_id))
         .map((p: any) => {
           const myClients = (clients || []).filter((c: any) => c.assigned_pk_id === p.user_id);
-          const active = myClients.filter((c: any) => (c.guidance_status || c.client_status) === "aktif" || (c.guidance_status || c.client_status) === "active").length;
+          const activeClients = myClients.filter((c: any) => {
+            const s = (c.guidance_status || c.client_status || "").toLowerCase();
+            return s === "aktif" || s === "active";
+          });
+          const active = activeClients.length;
           const done = myClients.filter((c: any) => ["selesai","done","terminated"].includes((c.guidance_status || c.client_status || "").toLowerCase())).length;
           const myClientIds = new Set(myClients.map((c: any) => c.id));
-          const reportsThisMonth = (reports || []).filter((r: any) =>
-            myClientIds.has(r.client_id) && r.report_month === thisMonth && r.report_year === thisYear).length;
+          const monthReports = (reports || []).filter((r: any) =>
+            myClientIds.has(r.client_id) && r.report_month === thisMonth && r.report_year === thisYear);
+          const reportedClientIds = new Set(monthReports.map((r: any) => r.client_id));
+          const sudahLapor = activeClients.filter((c: any) => reportedClientIds.has(c.id)).length;
+          const belumLapor = active - sudahLapor;
           return [
             p.full_name || "",
             p.phone || "",
             active,
             done,
-            reportsThisMonth,
+            sudahLapor,
+            belumLapor,
+            monthReports.length,
             fmtDay(p.created_at),
           ];
         }),
     };
+
 
     // ---------- 5. Rekap Bulanan (12 bulan terakhir) ----------
     const rekap: TabSpec = {
