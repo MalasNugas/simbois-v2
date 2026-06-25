@@ -118,7 +118,8 @@ export default function IntegrasiSpreadsheet() {
     if (!settings?.id) { toast.error('Simpan pengaturan dulu'); return; }
     setPulling(true);
     setPullResult(null);
-    const { data, error } = await supabase.functions.invoke('sheets-sync-pull', { body: {} });
+    const { data, error } = await supabase.functions.invoke('sheets-sync-pull', { body: { clients_tab: clientsTab.trim() || undefined } });
+
     setPulling(false);
     if (error || (data as any)?.error) {
       toast.error((data as any)?.error || error?.message || 'Import gagal');
