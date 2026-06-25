@@ -7,6 +7,14 @@ function quoteTab(tab: string) {
   return `'${tab.replace(/'/g, "''")}'`;
 }
 
+function normHeader(s: string) {
+  return String(s || "")
+    .toLowerCase()
+    .replace(/\./g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function formatSheetsImportError(error: unknown) {
   const msg = (error as Error).message || String(error);
   if (msg.includes("Google Sheets 429") || msg.includes("RATE_LIMIT_EXCEEDED") || msg.includes("Quota exceeded")) {
@@ -16,19 +24,28 @@ function formatSheetsImportError(error: unknown) {
     return "Gateway Google Sheets sedang gangguan sementara (502/503). Coba klik Tarik dari Sheet lagi dalam beberapa detik.";
   }
   if (msg.includes("Unable to parse range") || msg.includes("Google Sheets 400")) {
-    return 'Tab "Clients Import" belum ada. Klik "Buat Template Tab" terlebih dahulu.';
+    return 'Tab tidak ditemukan. Klik "Buat Template Tab" terlebih dahulu.';
   }
   return msg;
 }
 
-function rowsFromValues(values: string[][] = []): Row[] {
-  if (values.length < 2) return [];
-  const headers = values[0].map((h) => String(h || "").trim());
-  return values.slice(1).map((r) => {
-    const o: Row = {};
-    headers.forEach((h, i) => { o[h] = String(r[i] ?? "").trim(); });
-    return o;
-  }).filter((r) => Object.values(r).some((v) => v !== ""));
+const HEADER_ALIASES = {
+  case_number: ["no litmas", "no regis", "no register", "nomor litmas", "nomor regis", "no kasus", "case number"],
+  full_name: ["nama lengkap", "nama klien", "nama", "full name"],
+  pk_name: ["pegawai pk", "nama pegawai pk", "pk", "pegawai"],
+};
+
+function pickHeaderIndex(headers: string[], aliases: string[]): number {
+  const norm = headers.map(normHeader);
+  for (const a of aliases) {
+    const i = norm.indexOf(a);
+    if (i >= 0) return i;
+  }
+  // partial contains
+  for (let i = 0; i < norm.length; i++) {
+    if (aliases.some((a) => norm[i].includes(a))) return i;
+  }
+  return -1;
 }
 
 Deno.serve(async (req): Promise<Response> => {
@@ -39,25 +56,57 @@ Deno.serve(async (req): Promise<Response> => {
     const admin = auth.admin;
 
     const body = await req.json().catch(() => ({}));
-    const clientsTabName = body.clients_tab || "Clients Import";
+    const requestedTab = (body.clients_tab || "").trim();
 
     const { data: settings } = await admin
       .from("sheet_integration_settings").select("*").limit(1).maybeSingle();
     if (!settings) return json({ error: "Belum ada konfigurasi spreadsheet" }, 400);
     const sid = settings.spreadsheet_id;
 
-    let rows: Row[] = [];
+    // 1. Auto-detect tab
+    let tabUsed = requestedTab || "Clients Import";
+    let availableTabs: string[] = [];
     try {
-      const res = await gatewayFetch(
-        `/spreadsheets/${sid}/values:batchGet?ranges=${encodeURIComponent(quoteTab(clientsTabName))}`,
-      );
-      const valueRanges: Array<{ values?: string[][] }> = res?.valueRanges || [];
-      rows = rowsFromValues(valueRanges[0]?.values || []);
+      const meta = await gatewayFetch(`/spreadsheets/${sid}?fields=sheets.properties.title`);
+      availableTabs = (meta?.sheets || []).map((s: any) => s?.properties?.title).filter(Boolean);
+      const exact = availableTabs.find((t) => t === tabUsed);
+      const ci = availableTabs.find((t) => t.toLowerCase() === tabUsed.toLowerCase());
+      const containsClient = availableTabs.find((t) => /client|klien/i.test(t));
+      tabUsed = exact || ci || containsClient || availableTabs[0] || tabUsed;
     } catch (e) {
       return json({ ok: true, results: { clients: { created: 0, updated: 0, skipped: 0, errors: [formatSheetsImportError(e)] } } });
     }
 
-    const r = { created: 0, updated: 0, skipped: 0, errors: [] as string[] };
+    // 2. Fetch values for the chosen tab
+    let values: string[][] = [];
+    try {
+      const range = `${quoteTab(tabUsed)}!A:Z`;
+      const res = await gatewayFetch(
+        `/spreadsheets/${sid}/values:batchGet?ranges=${encodeURIComponent(range)}`,
+      );
+      const valueRanges: Array<{ values?: string[][] }> = res?.valueRanges || [];
+      values = valueRanges[0]?.values || [];
+    } catch (e) {
+      return json({ ok: true, results: { clients: { created: 0, updated: 0, skipped: 0, errors: [formatSheetsImportError(e)], tab_used: tabUsed, available_tabs: availableTabs } } });
+    }
+
+    const r: any = { created: 0, updated: 0, skipped: 0, errors: [] as string[], tab_used: tabUsed, available_tabs: availableTabs, rows_read: Math.max(0, values.length - 1) };
+
+    if (values.length < 2) {
+      r.errors.push(`Tab "${tabUsed}" kosong atau hanya berisi header. Tambahkan data mulai baris 2. Tab tersedia: ${availableTabs.join(", ") || "(tidak ada)"}.`);
+      return json({ ok: true, results: { clients: r } });
+    }
+
+    const headers = values[0].map((h) => String(h || "").trim());
+    r.headers_found = headers;
+    const idxCase = pickHeaderIndex(headers, HEADER_ALIASES.case_number);
+    const idxName = pickHeaderIndex(headers, HEADER_ALIASES.full_name);
+    const idxPk = pickHeaderIndex(headers, HEADER_ALIASES.pk_name);
+
+    if (idxCase < 0 || idxName < 0) {
+      r.errors.push(`Header tidak dikenali pada tab "${tabUsed}". Ditemukan: [${headers.join(" | ")}]. Wajib ada kolom "No. Litmas" dan "Nama Lengkap" (opsional: "Pegawai PK").`);
+      return json({ ok: true, results: { clients: r } });
+    }
 
     // Lookup pegawai by full_name (case-insensitive)
     const { data: pegProfiles } = await admin.from("profiles").select("user_id, full_name");
@@ -68,12 +117,15 @@ Deno.serve(async (req): Promise<Response> => {
         .map((p: any) => [String(p.full_name || "").toLowerCase().trim(), p.user_id]),
     );
 
-    for (let i = 0; i < rows.length; i++) {
-      const row = rows[i];
-      const case_number = (row["No. Litmas"] || row["No Litmas"] || "").trim();
-      const full_name = (row["Nama Lengkap"] || row["Nama Klien"] || "").trim();
-      const pkNameRaw = (row["Pegawai PK"] || "").trim();
+    const dataRows = values.slice(1);
+    for (let i = 0; i < dataRows.length; i++) {
+      const raw = dataRows[i];
+      const case_number = String(raw[idxCase] ?? "").trim();
+      const full_name = String(raw[idxName] ?? "").trim();
+      const pkNameRaw = idxPk >= 0 ? String(raw[idxPk] ?? "").trim() : "";
       const pkName = pkNameRaw.toLowerCase();
+
+      if (!case_number && !full_name && !pkNameRaw) continue; // skip empty row silently
 
       if (!case_number || !full_name) {
         r.errors.push(`Baris ${i + 2}: No. Litmas & Nama Lengkap wajib`); continue;

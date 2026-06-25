@@ -236,6 +236,15 @@ export default function IntegrasiSpreadsheet() {
                   <p className="text-xs">
                     Dibuat: <strong>{v.created || 0}</strong> · Di-update: <strong>{v.updated || 0}</strong> · Di-skip: <strong>{v.skipped || 0}</strong>
                   </p>
+                  {(v.tab_used || v.rows_read !== undefined) && (
+                    <p className="text-xs text-muted-foreground">
+                      Tab: <strong>{v.tab_used || '-'}</strong> · Baris terbaca: <strong>{v.rows_read ?? '-'}</strong>
+                      {v.available_tabs?.length ? <> · Tab tersedia: <em>{v.available_tabs.join(', ')}</em></> : null}
+                    </p>
+                  )}
+                  {v.headers_found?.length > 0 && (
+                    <p className="text-xs text-muted-foreground">Header: <em>{v.headers_found.join(' | ')}</em></p>
+                  )}
                   {v.errors?.length > 0 && (
                     <ul className="text-xs text-destructive list-disc pl-4 space-y-0.5">
                       {v.errors.map((e: string, i: number) => <li key={i}>{e}</li>)}
@@ -243,6 +252,7 @@ export default function IntegrasiSpreadsheet() {
                   )}
                 </div>
               ))}
+
             </div>
           )}
         </div>
