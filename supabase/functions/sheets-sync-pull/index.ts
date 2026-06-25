@@ -219,12 +219,25 @@ Deno.serve(async (req): Promise<Response> => {
     const idxCase = pickHeaderIndex(headers, HEADER_ALIASES.case_number);
     const idxName = pickHeaderIndex(headers, HEADER_ALIASES.full_name);
     const idxPk = pickHeaderIndex(headers, HEADER_ALIASES.pk_name);
+    const idxAddress = pickHeaderIndex(headers, HEADER_ALIASES.address);
+    const idxPhone = pickHeaderIndex(headers, HEADER_ALIASES.phone);
+    const idxGender = pickHeaderIndex(headers, HEADER_ALIASES.gender);
+    const idxTTL = pickHeaderIndex(headers, HEADER_ALIASES.birth_ttl);
+    const idxEnd = pickHeaderIndex(headers, HEADER_ALIASES.guidance_end);
+    const idxAsim = pickHeaderIndex(headers, HEADER_ALIASES.guidance_start_asimilasi);
+    const idxInt = pickHeaderIndex(headers, HEADER_ALIASES.guidance_start_integrasi);
+    const idxStatus = pickHeaderIndex(headers, HEADER_ALIASES.status);
 
     if (idxCase < 0 || idxName < 0) {
       r.errors.push(`Header tidak dikenali pada tab "${tabUsed}" (baris ${headerRowIdx + 1}). Ditemukan: [${headers.join(" | ")}]. Wajib ada kolom "No. Litmas" dan "Nama Lengkap" (opsional: "Pegawai PK").`);
       return json({ ok: true, results: { clients: r } });
     }
 
+    r.headers_mapped = {
+      case_number: idxCase, full_name: idxName, pk: idxPk,
+      address: idxAddress, phone: idxPhone, gender: idxGender, ttl: idxTTL,
+      guidance_end: idxEnd, asimilasi: idxAsim, integrasi: idxInt, status: idxStatus,
+    };
 
     // Lookup pegawai by full_name (case-insensitive)
     const { data: pegProfiles } = await admin.from("profiles").select("user_id, full_name");
@@ -235,22 +248,34 @@ Deno.serve(async (req): Promise<Response> => {
         .map((p: any) => [String(p.full_name || "").toLowerCase().trim(), p.user_id]),
     );
 
+    const cell = (raw: string[], idx: number) => idx >= 0 ? String(raw[idx] ?? "").trim() : "";
+
     const dataRows = values.slice(headerRowIdx + 1);
     r.rows_read = dataRows.length;
     for (let i = 0; i < dataRows.length; i++) {
-      const raw = dataRows[i];
-      const case_number = String(raw[idxCase] ?? "").trim();
-      const full_name = String(raw[idxName] ?? "").trim();
-      const pkNameRaw = idxPk >= 0 ? String(raw[idxPk] ?? "").trim() : "";
+      const raw = dataRows[i] || [];
+      const case_number = cell(raw, idxCase);
+      const full_name = cell(raw, idxName);
+      const pkNameRaw = cell(raw, idxPk);
       const pkName = pkNameRaw.toLowerCase();
 
+      const addressVal = cell(raw, idxAddress);
+      const phoneVal = cell(raw, idxPhone);
+      const genderVal = normGender(cell(raw, idxGender));
+      const ttl = parseTTL(cell(raw, idxTTL));
+      const endDate = parseDateID(cell(raw, idxEnd));
+      const asimDate = parseDateID(cell(raw, idxAsim));
+      const intDate = parseDateID(cell(raw, idxInt));
+      const startDate = asimDate || intDate;
+      const statusVal = normStatus(cell(raw, idxStatus));
+
       const sheetRowNum = headerRowIdx + 2 + i;
-      if (!case_number && !full_name && !pkNameRaw) continue; // skip empty row silently
+      const hasAny = case_number || full_name || pkNameRaw || addressVal || phoneVal || genderVal || ttl.place || ttl.date || endDate || startDate || statusVal;
+      if (!hasAny) continue; // skip empty row silently
 
       if (!case_number || !full_name) {
         r.errors.push(`Baris ${sheetRowNum}: No. Litmas & Nama Lengkap wajib`); continue;
       }
-
 
       const { data: existingClient } = await admin
         .from("clients").select("id, user_id").eq("case_number", case_number).maybeSingle();
@@ -269,12 +294,24 @@ Deno.serve(async (req): Promise<Response> => {
         }
       }
 
-      await admin.from("profiles").update({ full_name }).eq("user_id", existingClient.user_id);
+      // Build profile patch — only set fields with non-empty values
+      const profilePatch: any = { full_name };
+      if (addressVal) profilePatch.address = addressVal;
+      if (phoneVal) profilePatch.phone = phoneVal;
+      if (genderVal) profilePatch.gender = genderVal;
+      if (ttl.place) profilePatch.birth_place = ttl.place;
+      if (ttl.date) profilePatch.birth_date = ttl.date;
+      await admin.from("profiles").update(profilePatch).eq("user_id", existingClient.user_id);
+
       const clientPatch: any = { case_number };
       if (assigned_pk_id !== null || !pkName) clientPatch.assigned_pk_id = assigned_pk_id;
+      if (endDate) clientPatch.guidance_end = endDate;
+      if (startDate) clientPatch.guidance_start = startDate;
+      if (statusVal) clientPatch.client_status = statusVal;
       await admin.from("clients").update(clientPatch).eq("id", existingClient.id);
       r.updated++;
     }
+
 
     return json({ ok: true, results: { clients: r } });
   } catch (e) {
