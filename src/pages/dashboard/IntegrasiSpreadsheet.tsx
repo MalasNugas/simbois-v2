@@ -29,6 +29,8 @@ export default function IntegrasiSpreadsheet() {
 
   const [settings, setSettings] = useState<any>(null);
   const [urlInput, setUrlInput] = useState('');
+  const [clientsTab, setClientsTab] = useState('');
+
 
   useEffect(() => {
     if (authLoading) return;
@@ -116,7 +118,8 @@ export default function IntegrasiSpreadsheet() {
     if (!settings?.id) { toast.error('Simpan pengaturan dulu'); return; }
     setPulling(true);
     setPullResult(null);
-    const { data, error } = await supabase.functions.invoke('sheets-sync-pull', { body: {} });
+    const { data, error } = await supabase.functions.invoke('sheets-sync-pull', { body: { clients_tab: clientsTab.trim() || undefined } });
+
     setPulling(false);
     if (error || (data as any)?.error) {
       toast.error((data as any)?.error || error?.message || 'Import gagal');
@@ -203,9 +206,9 @@ export default function IntegrasiSpreadsheet() {
             <h2 className="font-semibold">Import Client dari Spreadsheet</h2>
           </div>
           <div className="text-sm text-muted-foreground space-y-2">
-            <p>Buat tab <strong>Clients Import</strong> di spreadsheet dengan 3 kolom berikut, lalu klik <strong>Tarik dari Sheet</strong>:</p>
+            <p>Default-nya import akan membaca tab <strong>MASTER DATA</strong>. Wajib ada 3 kolom (nama bebas, alias dikenali otomatis):</p>
             <div className="text-xs p-3 rounded-lg bg-muted/30 font-mono">
-              No. Litmas | Nama Lengkap | Pegawai PK
+              No. Litmas / Register | Nama Lengkap / Nama Klien | Pegawai PK / PK Pembimbing
             </div>
             <ul className="text-xs space-y-1 pl-4 list-disc">
               <li><strong>No. Litmas</strong> dipakai untuk mencocokkan klien yang sudah ada.</li>
@@ -213,10 +216,17 @@ export default function IntegrasiSpreadsheet() {
               <li><strong>Pegawai PK</strong> diisi nama lengkap pegawai (harus sudah punya akun pegawai di sistem).</li>
             </ul>
           </div>
+          <div className="space-y-2">
+            <Label htmlFor="clients-tab">Tab sumber klien (opsional)</Label>
+            <Input id="clients-tab" value={clientsTab} onChange={(e) => setClientsTab(e.target.value)}
+              placeholder="Kosongkan = auto-detect MASTER DATA" />
+            <p className="text-xs text-muted-foreground">Isi nama tab persis jika ingin override (mis. "Copy of MASTER DATA").</p>
+          </div>
           <div className="flex items-start gap-2 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/30 text-xs">
             <AlertTriangle className="w-4 h-4 text-yellow-500 shrink-0 mt-0.5" />
             <span>Import ini hanya meng-update klien yang sudah ada. Untuk klien baru, tambahkan lewat dashboard admin terlebih dahulu (butuh akun login).</span>
           </div>
+
 
           <div className="flex gap-2 flex-wrap">
             <Button onClick={handleCreateTemplate} disabled={creatingTabs || !settings?.id || canWrite === false} variant="outline" className="gap-2">

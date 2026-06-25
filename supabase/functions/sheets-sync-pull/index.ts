@@ -30,10 +30,11 @@ function formatSheetsImportError(error: unknown) {
 }
 
 const HEADER_ALIASES = {
-  case_number: ["no litmas", "no regis", "no register", "nomor litmas", "nomor regis", "no kasus", "case number"],
-  full_name: ["nama lengkap", "nama klien", "nama", "full name"],
-  pk_name: ["pegawai pk", "nama pegawai pk", "pk", "pegawai"],
+  case_number: ["no litmas", "no regis", "no register", "no reg", "nomor litmas", "nomor regis", "nomor register", "register", "litmas", "no kasus", "case number"],
+  full_name: ["nama lengkap", "nama klien", "nama klien bimbingan", "nama klien pk", "nama", "full name"],
+  pk_name: ["pegawai pk", "nama pegawai pk", "pk pembimbing", "pegawai pembimbing", "nama pk", "pembimbing", "pk", "pegawai"],
 };
+
 
 function pickHeaderIndex(headers: string[], aliases: string[]): number {
   const norm = headers.map(normHeader);
@@ -63,19 +64,27 @@ Deno.serve(async (req): Promise<Response> => {
     if (!settings) return json({ error: "Belum ada konfigurasi spreadsheet" }, 400);
     const sid = settings.spreadsheet_id;
 
-    // 1. Auto-detect tab
-    let tabUsed = requestedTab || "Clients Import";
+    // 1. Auto-detect tab: prioritize user override → MASTER DATA → master/klien/client → first
+    let tabUsed = requestedTab || "MASTER DATA";
     let availableTabs: string[] = [];
     try {
       const meta = await gatewayFetch(`/spreadsheets/${sid}?fields=sheets.properties.title`);
       availableTabs = (meta?.sheets || []).map((s: any) => s?.properties?.title).filter(Boolean);
-      const exact = availableTabs.find((t) => t === tabUsed);
-      const ci = availableTabs.find((t) => t.toLowerCase() === tabUsed.toLowerCase());
-      const containsClient = availableTabs.find((t) => /client|klien/i.test(t));
-      tabUsed = exact || ci || containsClient || availableTabs[0] || tabUsed;
+      if (requestedTab) {
+        const exact = availableTabs.find((t) => t === requestedTab);
+        const ci = availableTabs.find((t) => t.toLowerCase() === requestedTab.toLowerCase());
+        tabUsed = exact || ci || requestedTab;
+      } else {
+        const master = availableTabs.find((t) => t.toLowerCase() === "master data")
+          || availableTabs.find((t) => /master\s*data/i.test(t))
+          || availableTabs.find((t) => /master/i.test(t))
+          || availableTabs.find((t) => /klien|client/i.test(t));
+        tabUsed = master || availableTabs[0] || tabUsed;
+      }
     } catch (e) {
       return json({ ok: true, results: { clients: { created: 0, updated: 0, skipped: 0, errors: [formatSheetsImportError(e)] } } });
     }
+
 
     // 2. Fetch values for the chosen tab
     let values: string[][] = [];
