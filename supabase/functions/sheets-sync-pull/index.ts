@@ -3,19 +3,22 @@ import { corsHeaders, json, requireAdmin, gatewayFetch } from "../_shared/sheets
 
 type Row = Record<string, string>;
 
-async function readTab(spreadsheet_id: string, tab: string): Promise<Row[]> {
-  const quoted = `'${tab.replace(/'/g, "''")}'`;
-  let res: any;
-  try {
-    res = await gatewayFetch(`/spreadsheets/${spreadsheet_id}/values/${quoted}`);
-  } catch (e) {
-    const msg = (e as Error).message || "";
-    if (msg.includes("Unable to parse range") || msg.includes("400")) {
-      throw new Error(`Tab "${tab}" belum ada di spreadsheet. Klik "Buat Template Tab" terlebih dahulu.`);
-    }
-    throw e;
+function quoteTab(tab: string) {
+  return `'${tab.replace(/'/g, "''")}'`;
+}
+
+function formatSheetsImportError(error: unknown) {
+  const msg = (error as Error).message || String(error);
+  if (msg.includes("Google Sheets 429") || msg.includes("RATE_LIMIT_EXCEEDED") || msg.includes("Quota exceeded")) {
+    return "Kuota baca Google Sheets sedang penuh (429). Tunggu 1–2 menit lalu klik Tarik dari Sheet lagi. Import sudah dioptimalkan memakai batch request agar lebih hemat kuota.";
   }
-  const values: string[][] = res?.values || [];
+  if (msg.includes("Unable to parse range") || msg.includes("Google Sheets 400")) {
+    return 'Tab import belum lengkap di spreadsheet. Klik "Buat Template Tab" terlebih dahulu, lalu coba import lagi.';
+  }
+  return msg;
+}
+
+function rowsFromValues(values: string[][] = []): Row[] {
   if (values.length < 2) return [];
   const headers = values[0].map((h) => String(h || "").trim());
   return values.slice(1).map((r) => {
@@ -23,6 +26,23 @@ async function readTab(spreadsheet_id: string, tab: string): Promise<Row[]> {
     headers.forEach((h, i) => { o[h] = String(r[i] ?? "").trim(); });
     return o;
   }).filter((r) => Object.values(r).some((v) => v !== ""));
+}
+
+async function readTabs(spreadsheet_id: string, tabs: string[]): Promise<Record<string, Row[]>> {
+  const uniqueTabs = [...new Set(tabs.filter(Boolean))];
+  if (uniqueTabs.length === 0) return {};
+  const query = uniqueTabs.map((tab) => `ranges=${encodeURIComponent(quoteTab(tab))}`).join("&");
+  let res: any;
+  try {
+    res = await gatewayFetch(`/spreadsheets/${spreadsheet_id}/values:batchGet?${query}`);
+  } catch (e) {
+    throw new Error(formatSheetsImportError(e));
+  }
+  const valueRanges: Array<{ values?: string[][] }> = res?.valueRanges || [];
+  return uniqueTabs.reduce((acc, tab, i) => {
+    acc[tab] = rowsFromValues(valueRanges[i]?.values || []);
+    return acc;
+  }, {} as Record<string, Row[]>);
 }
 
 
@@ -70,12 +90,28 @@ Deno.serve(async (req) => {
     const sid = settings.spreadsheet_id;
 
     const results: Record<string, any> = {};
+    const selectedImports = [
+      { key: "pegawai", tab: pegawaiTabName, enabled: importPegawai },
+      { key: "clients", tab: clientsTabName, enabled: importClients },
+      { key: "reports", tab: reportsTabName, enabled: importReports },
+    ].filter((item) => item.enabled);
+    let sheetRows: Record<string, Row[]> = {};
+
+    try {
+      sheetRows = await readTabs(sid, selectedImports.map((item) => item.tab));
+    } catch (e) {
+      const message = formatSheetsImportError(e);
+      selectedImports.forEach((item) => {
+        results[item.key] = { created: 0, updated: 0, skipped: 0, errors: [message] };
+      });
+      return json({ ok: true, results });
+    }
 
     // ---- Pegawai PK ----
     if (importPegawai) {
       const r = { created: 0, skipped: 0, errors: [] as string[] };
       try {
-        const rows = await readTab(sid, pegawaiTabName);
+        const rows = sheetRows[pegawaiTabName] || [];
         for (let i = 0; i < rows.length; i++) {
           const row = rows[i];
           const email = (row["Email"] || "").toLowerCase();
@@ -107,7 +143,7 @@ Deno.serve(async (req) => {
     if (importClients) {
       const r = { created: 0, updated: 0, skipped: 0, errors: [] as string[] };
       try {
-        const rows = await readTab(sid, clientsTabName);
+        const rows = sheetRows[clientsTabName] || [];
 
         // Lookup pegawai by full_name
         const { data: pegProfiles } = await admin
@@ -190,7 +226,7 @@ Deno.serve(async (req) => {
     if (importReports) {
       const r = { created: 0, updated: 0, skipped: 0, errors: [] as string[] };
       try {
-        const rows = await readTab(sid, reportsTabName);
+        const rows = sheetRows[reportsTabName] || [];
         const { data: allClients } = await admin.from("clients").select("id, case_number");
         const byCase = new Map((allClients || []).map((c: any) => [c.case_number, c.id]));
 
