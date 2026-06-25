@@ -1,23 +1,16 @@
-## Tujuan
-Tarik data klien dari tab **MASTER DATA** (bukan "Clients Import" yang kosong) tanpa harus menyalin data manual.
+## Masalah
 
-## Perubahan
+Tab `MASTER DATA` terbaca tapi `headers_found: []` — artinya baris pertama kosong (kemungkinan judul yang di-merge atau baris blank di atas header asli). Kode saat ini selalu menganggap `values[0]` sebagai header, jadi semua data ditolak.
 
-### 1. `supabase/functions/sheets-sync-pull/index.ts`
-- Ganti urutan auto-detect tab: prioritas `MASTER DATA` (exact, case-insensitive) → tab yang mengandung "master" / "klien" / "client" → tab yang diminta user → tab pertama.
-- Tetap hormati `clients_tab` dari body request bila admin override dari UI.
-- Perluas `HEADER_ALIASES` dengan istilah umum di sheet BAPAS:
-  - `case_number`: tambah `"no register"`, `"no reg"`, `"register"`, `"litmas"`
-  - `full_name`: tambah `"nama klien bimbingan"`, `"nama klien pk"`, `"nama"`
-  - `pk_name`: tambah `"pk pembimbing"`, `"pembimbing"`, `"nama pk"`, `"pegawai pembimbing"`
-- Jika header masih tak dikenali, error sudah informatif (menampilkan list header) — admin tinggal kirim ulang dengan `clients_tab` override.
+## Solusi
 
-### 2. `src/pages/dashboard/IntegrasiSpreadsheet.tsx`
-- Tambah input "Tab sumber klien (opsional)" — default kosong = auto-detect MASTER DATA.
-- Kirim `clients_tab` ke edge function saat klik **Tarik dari Sheet**.
-- Setelah tarik, jika `headers_found` ada tapi tidak dikenali, tampilkan hint: "Salin nama kolom persis ke input Tab + minta admin tambah alias header."
+**`supabase/functions/sheets-sync-pull/index.ts`** — auto-detect baris header, bukan asumsi baris 1.
 
-## Catatan
-- Tidak ada perubahan schema DB / RLS.
-- Tab `Clients Import` template bisa diabaikan/dihapus user; tidak lagi jadi target default.
-- Karena user belum memberi nama kolom persis di MASTER DATA, jika alias di atas masih meleset, hasilnya akan menampilkan daftar header — saya akan tambahkan alias spesifik berdasarkan output tersebut di iterasi berikut.
+1. Ambil range lebih luas (`A1:Z50`) lalu pindai 15 baris pertama. Untuk tiap baris, hitung `pickHeaderIndex` terhadap alias `case_number` dan `full_name`. Baris pertama yang mengenali **keduanya** dipakai sebagai header; baris di bawahnya jadi data.
+2. Jika tidak ada baris yang cocok, kembalikan pesan error yang menampilkan **3 baris teratas yang non-kosong** (bukan `[]` kosong) supaya admin tahu apa yang benar-benar ada di sheet.
+3. Tambah opsi override manual: kalau body request berisi `header_row` (1-indexed), pakai itu langsung tanpa auto-detect.
+4. `rows_read` dihitung dari `values.length - (headerRowIndex + 1)`.
+
+**`src/pages/dashboard/IntegrasiSpreadsheet.tsx`** — tambah input opsional "Baris header (kosongkan = auto)" di sebelah "Tab sumber klien", kirim sebagai `header_row` ke edge function. Default tetap auto-detect.
+
+Tidak ada perubahan DB, RLS, atau tabel lain. Header alias yang sudah ada tetap dipakai.

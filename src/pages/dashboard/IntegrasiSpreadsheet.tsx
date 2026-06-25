@@ -30,6 +30,8 @@ export default function IntegrasiSpreadsheet() {
   const [settings, setSettings] = useState<any>(null);
   const [urlInput, setUrlInput] = useState('');
   const [clientsTab, setClientsTab] = useState('');
+  const [headerRow, setHeaderRow] = useState('');
+
 
 
   useEffect(() => {
@@ -118,7 +120,9 @@ export default function IntegrasiSpreadsheet() {
     if (!settings?.id) { toast.error('Simpan pengaturan dulu'); return; }
     setPulling(true);
     setPullResult(null);
-    const { data, error } = await supabase.functions.invoke('sheets-sync-pull', { body: { clients_tab: clientsTab.trim() || undefined } });
+    const hr = parseInt(headerRow, 10);
+    const { data, error } = await supabase.functions.invoke('sheets-sync-pull', { body: { clients_tab: clientsTab.trim() || undefined, header_row: Number.isFinite(hr) && hr > 0 ? hr : undefined } });
+
 
     setPulling(false);
     if (error || (data as any)?.error) {
@@ -216,12 +220,21 @@ export default function IntegrasiSpreadsheet() {
               <li><strong>Pegawai PK</strong> diisi nama lengkap pegawai (harus sudah punya akun pegawai di sistem).</li>
             </ul>
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="clients-tab">Tab sumber klien (opsional)</Label>
-            <Input id="clients-tab" value={clientsTab} onChange={(e) => setClientsTab(e.target.value)}
-              placeholder="Kosongkan = auto-detect MASTER DATA" />
-            <p className="text-xs text-muted-foreground">Isi nama tab persis jika ingin override (mis. "Copy of MASTER DATA").</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label htmlFor="clients-tab">Tab sumber klien (opsional)</Label>
+              <Input id="clients-tab" value={clientsTab} onChange={(e) => setClientsTab(e.target.value)}
+                placeholder="Kosongkan = auto-detect MASTER DATA" />
+              <p className="text-xs text-muted-foreground">Isi nama tab persis jika ingin override (mis. "Copy of MASTER DATA").</p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="header-row">Baris header (opsional)</Label>
+              <Input id="header-row" type="number" min={1} value={headerRow} onChange={(e) => setHeaderRow(e.target.value)}
+                placeholder="Kosongkan = auto-detect" />
+              <p className="text-xs text-muted-foreground">Isi nomor baris yang berisi judul kolom jika auto-detect gagal (mis. 2 atau 3).</p>
+            </div>
           </div>
+
           <div className="flex items-start gap-2 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/30 text-xs">
             <AlertTriangle className="w-4 h-4 text-yellow-500 shrink-0 mt-0.5" />
             <span>Import ini hanya meng-update klien yang sudah ada. Untuk klien baru, tambahkan lewat dashboard admin terlebih dahulu (butuh akun login).</span>
