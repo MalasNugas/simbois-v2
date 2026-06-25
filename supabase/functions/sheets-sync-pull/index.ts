@@ -30,10 +30,11 @@ function formatSheetsImportError(error: unknown) {
 }
 
 const HEADER_ALIASES = {
-  case_number: ["no litmas", "no regis", "no register", "nomor litmas", "nomor regis", "no kasus", "case number"],
-  full_name: ["nama lengkap", "nama klien", "nama", "full name"],
-  pk_name: ["pegawai pk", "nama pegawai pk", "pk", "pegawai"],
+  case_number: ["no litmas", "no regis", "no register", "no reg", "nomor litmas", "nomor regis", "nomor register", "register", "litmas", "no kasus", "case number"],
+  full_name: ["nama lengkap", "nama klien", "nama klien bimbingan", "nama klien pk", "nama", "full name"],
+  pk_name: ["pegawai pk", "nama pegawai pk", "pk pembimbing", "pegawai pembimbing", "nama pk", "pembimbing", "pk", "pegawai"],
 };
+
 
 function pickHeaderIndex(headers: string[], aliases: string[]): number {
   const norm = headers.map(normHeader);
