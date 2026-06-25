@@ -154,7 +154,8 @@ Deno.serve(async (req): Promise<Response> => {
         .map((p: any) => [String(p.full_name || "").toLowerCase().trim(), p.user_id]),
     );
 
-    const dataRows = values.slice(1);
+    const dataRows = values.slice(headerRowIdx + 1);
+    r.rows_read = dataRows.length;
     for (let i = 0; i < dataRows.length; i++) {
       const raw = dataRows[i];
       const case_number = String(raw[idxCase] ?? "").trim();
@@ -162,11 +163,13 @@ Deno.serve(async (req): Promise<Response> => {
       const pkNameRaw = idxPk >= 0 ? String(raw[idxPk] ?? "").trim() : "";
       const pkName = pkNameRaw.toLowerCase();
 
+      const sheetRowNum = headerRowIdx + 2 + i;
       if (!case_number && !full_name && !pkNameRaw) continue; // skip empty row silently
 
       if (!case_number || !full_name) {
-        r.errors.push(`Baris ${i + 2}: No. Litmas & Nama Lengkap wajib`); continue;
+        r.errors.push(`Baris ${sheetRowNum}: No. Litmas & Nama Lengkap wajib`); continue;
       }
+
 
       const { data: existingClient } = await admin
         .from("clients").select("id, user_id").eq("case_number", case_number).maybeSingle();
