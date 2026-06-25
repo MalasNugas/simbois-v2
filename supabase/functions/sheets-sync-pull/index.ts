@@ -12,6 +12,9 @@ function formatSheetsImportError(error: unknown) {
   if (msg.includes("Google Sheets 429") || msg.includes("RATE_LIMIT_EXCEEDED") || msg.includes("Quota exceeded")) {
     return "Kuota baca Google Sheets sedang penuh (429). Tunggu 1–2 menit lalu klik Tarik dari Sheet lagi.";
   }
+  if (msg.includes("Google Sheets 502") || msg.includes("Google Sheets 503") || msg.includes("Google Sheets 504") || msg.includes("upstream_request_failed")) {
+    return "Gateway Google Sheets sedang gangguan sementara (502/503). Coba klik Tarik dari Sheet lagi dalam beberapa detik.";
+  }
   if (msg.includes("Unable to parse range") || msg.includes("Google Sheets 400")) {
     return 'Tab "Clients Import" belum ada. Klik "Buat Template Tab" terlebih dahulu.';
   }
