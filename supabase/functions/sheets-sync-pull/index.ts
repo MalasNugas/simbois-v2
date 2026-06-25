@@ -176,7 +176,7 @@ Deno.serve(async (req): Promise<Response> => {
 
       if (!existingClient) {
         r.skipped++;
-        r.errors.push(`Baris ${i + 2} (${case_number}): Klien belum ada. Tambah klien via dashboard admin terlebih dahulu.`);
+        r.errors.push(`Baris ${sheetRowNum} (${case_number}): Klien belum ada. Tambah klien via dashboard admin terlebih dahulu.`);
         continue;
       }
 
