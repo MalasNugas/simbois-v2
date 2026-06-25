@@ -51,15 +51,27 @@ export function gatewayHeaders() {
 }
 
 export async function gatewayFetch(path: string, init: RequestInit = {}) {
-  const res = await fetch(`${GATEWAY_URL}${path}`, {
-    ...init,
-    headers: { ...gatewayHeaders(), ...(init.headers || {}) },
-  });
-  const text = await res.text();
-  let body: any = null;
-  try { body = text ? JSON.parse(text) : null; } catch { body = text; }
-  if (!res.ok) {
-    throw new Error(`Google Sheets ${res.status}: ${typeof body === "string" ? body : JSON.stringify(body)}`);
+  const url = `${GATEWAY_URL}${path}`;
+  const headers = { ...gatewayHeaders(), ...(init.headers || {}) };
+  let lastErr: { status: number; body: any } | null = null;
+  // Retry transient gateway errors (502/503/504) and 429 with backoff
+  const delays = [500, 1200, 2500];
+  for (let attempt = 0; attempt <= delays.length; attempt++) {
+    let res: Response;
+    try {
+      res = await fetch(url, { ...init, headers });
+    } catch (e) {
+      if (attempt < delays.length) { await new Promise((r) => setTimeout(r, delays[attempt])); continue; }
+      throw new Error(`Google Sheets network error: ${(e as Error).message}`);
+    }
+    const text = await res.text();
+    let body: any = null;
+    try { body = text ? JSON.parse(text) : null; } catch { body = text; }
+    if (res.ok) return body;
+    lastErr = { status: res.status, body };
+    const retryable = res.status === 429 || res.status === 502 || res.status === 503 || res.status === 504;
+    if (!retryable || attempt === delays.length) break;
+    await new Promise((r) => setTimeout(r, delays[attempt]));
   }
-  return body;
+  throw new Error(`Google Sheets ${lastErr!.status}: ${typeof lastErr!.body === "string" ? lastErr!.body : JSON.stringify(lastErr!.body)}`);
 }
