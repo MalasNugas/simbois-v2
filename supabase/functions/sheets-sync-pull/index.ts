@@ -33,7 +33,88 @@ const HEADER_ALIASES = {
   case_number: ["no litmas", "no regis", "no register", "no reg", "nomor litmas", "nomor regis", "nomor register", "register", "litmas", "no kasus", "case number"],
   full_name: ["nama lengkap", "nama klien", "nama klien bimbingan", "nama klien pk", "nama", "full name"],
   pk_name: ["pegawai pk", "nama pegawai pk", "pk pembimbing", "pegawai pembimbing", "nama pk", "pembimbing", "pk", "pegawai"],
+  address: ["alamat"],
+  phone: ["no telepon", "nomor telepon", "telepon", "no telp", "telp", "hp", "no hp"],
+  gender: ["jenis kelamin", "jk", "kelamin"],
+  birth_ttl: ["tempat tanggal lahir", "ttl", "tempat/tanggal lahir", "tempat dan tanggal lahir"],
+  guidance_end: ["pengakhiran bimbingan", "tanggal pengakhiran", "pengakhiran", "tgl pengakhiran"],
+  guidance_start_asimilasi: ["tanggal asimilasi", "tgl asimilasi"],
+  guidance_start_integrasi: ["tanggal integrasi", "tgl integrasi"],
+  status: ["status"],
 };
+
+const ID_MONTHS: Record<string, number> = {
+  januari: 1, februari: 2, maret: 3, april: 4, mei: 5, juni: 6,
+  juli: 7, agustus: 8, september: 9, oktober: 10, november: 11, desember: 12,
+  jan: 1, feb: 2, mar: 3, apr: 4, jun: 6, jul: 7, agu: 8, ags: 8, sep: 9, okt: 10, nov: 11, des: 12,
+};
+
+function parseDateID(s: string): string | null {
+  const t = String(s || "").trim();
+  if (!t) return null;
+  // yyyy-mm-dd
+  let m = t.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (m) {
+    const y = +m[1], mo = +m[2], d = +m[3];
+    if (mo >= 1 && mo <= 12 && d >= 1 && d <= 31) return `${y}-${String(mo).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+  }
+  // dd/mm/yyyy or dd-mm-yyyy or dd.mm.yyyy
+  m = t.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/);
+  if (m) {
+    const d = +m[1], mo = +m[2]; let y = +m[3];
+    if (y < 100) y += 2000;
+    if (mo >= 1 && mo <= 12 && d >= 1 && d <= 31) return `${y}-${String(mo).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+  }
+  // dd Month yyyy (Indonesian)
+  m = t.match(/^(\d{1,2})\s+([A-Za-z]+)\s+(\d{2,4})$/);
+  if (m) {
+    const d = +m[1], mo = ID_MONTHS[m[2].toLowerCase()]; let y = +m[3];
+    if (y < 100) y += 2000;
+    if (mo && d >= 1 && d <= 31) return `${y}-${String(mo).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+  }
+  return null;
+}
+
+function parseTTL(s: string): { place: string; date: string | null } {
+  const t = String(s || "").trim();
+  if (!t) return { place: "", date: null };
+  // "Place, dd/mm/yyyy" or "Place dd Month yyyy"
+  const commaIdx = t.lastIndexOf(",");
+  if (commaIdx > 0) {
+    const place = t.slice(0, commaIdx).trim();
+    const datePart = t.slice(commaIdx + 1).trim();
+    const d = parseDateID(datePart);
+    if (d) return { place, date: d };
+  }
+  // try: word(s) then date at end
+  const m = t.match(/^(.+?)\s+(\d{1,2}[\/\-.\s][\w]+[\/\-.\s]\d{2,4})$/);
+  if (m) {
+    const d = parseDateID(m[2].trim());
+    if (d) return { place: m[1].trim(), date: d };
+  }
+  return { place: t, date: null };
+}
+
+function normGender(s: string): string | null {
+  const t = String(s || "").trim().toLowerCase();
+  if (!t) return null;
+  if (t === "l" || t.startsWith("laki") || t === "pria" || t === "m" || t === "male") return "laki-laki";
+  if (t === "p" || t.startsWith("perempuan") || t === "wanita" || t === "f" || t === "female") return "perempuan";
+  return null;
+}
+
+function normStatus(s: string): string | null {
+  const t = String(s || "").trim().toLowerCase();
+  if (!t) return null;
+  // take first token (before "/" or space)
+  const first = t.split(/[\/\s]+/)[0];
+  if (first.startsWith("aktif")) return "aktif";
+  if (first.startsWith("berakhir")) return "berakhir";
+  if (first.startsWith("pencabutan") || first.startsWith("cabut")) return "pencabutan";
+  if (first.startsWith("meninggal") || t.includes("meninggal")) return "meninggal_dunia";
+  if (first.startsWith("dilimpahkan") || first.startsWith("limpah")) return "dilimpahkan";
+  return null;
+}
 
 
 function pickHeaderIndex(headers: string[], aliases: string[]): number {
@@ -138,12 +219,25 @@ Deno.serve(async (req): Promise<Response> => {
     const idxCase = pickHeaderIndex(headers, HEADER_ALIASES.case_number);
     const idxName = pickHeaderIndex(headers, HEADER_ALIASES.full_name);
     const idxPk = pickHeaderIndex(headers, HEADER_ALIASES.pk_name);
+    const idxAddress = pickHeaderIndex(headers, HEADER_ALIASES.address);
+    const idxPhone = pickHeaderIndex(headers, HEADER_ALIASES.phone);
+    const idxGender = pickHeaderIndex(headers, HEADER_ALIASES.gender);
+    const idxTTL = pickHeaderIndex(headers, HEADER_ALIASES.birth_ttl);
+    const idxEnd = pickHeaderIndex(headers, HEADER_ALIASES.guidance_end);
+    const idxAsim = pickHeaderIndex(headers, HEADER_ALIASES.guidance_start_asimilasi);
+    const idxInt = pickHeaderIndex(headers, HEADER_ALIASES.guidance_start_integrasi);
+    const idxStatus = pickHeaderIndex(headers, HEADER_ALIASES.status);
 
     if (idxCase < 0 || idxName < 0) {
       r.errors.push(`Header tidak dikenali pada tab "${tabUsed}" (baris ${headerRowIdx + 1}). Ditemukan: [${headers.join(" | ")}]. Wajib ada kolom "No. Litmas" dan "Nama Lengkap" (opsional: "Pegawai PK").`);
       return json({ ok: true, results: { clients: r } });
     }
 
+    r.headers_mapped = {
+      case_number: idxCase, full_name: idxName, pk: idxPk,
+      address: idxAddress, phone: idxPhone, gender: idxGender, ttl: idxTTL,
+      guidance_end: idxEnd, asimilasi: idxAsim, integrasi: idxInt, status: idxStatus,
+    };
 
     // Lookup pegawai by full_name (case-insensitive)
     const { data: pegProfiles } = await admin.from("profiles").select("user_id, full_name");
@@ -154,22 +248,34 @@ Deno.serve(async (req): Promise<Response> => {
         .map((p: any) => [String(p.full_name || "").toLowerCase().trim(), p.user_id]),
     );
 
+    const cell = (raw: string[], idx: number) => idx >= 0 ? String(raw[idx] ?? "").trim() : "";
+
     const dataRows = values.slice(headerRowIdx + 1);
     r.rows_read = dataRows.length;
     for (let i = 0; i < dataRows.length; i++) {
-      const raw = dataRows[i];
-      const case_number = String(raw[idxCase] ?? "").trim();
-      const full_name = String(raw[idxName] ?? "").trim();
-      const pkNameRaw = idxPk >= 0 ? String(raw[idxPk] ?? "").trim() : "";
+      const raw = dataRows[i] || [];
+      const case_number = cell(raw, idxCase);
+      const full_name = cell(raw, idxName);
+      const pkNameRaw = cell(raw, idxPk);
       const pkName = pkNameRaw.toLowerCase();
 
+      const addressVal = cell(raw, idxAddress);
+      const phoneVal = cell(raw, idxPhone);
+      const genderVal = normGender(cell(raw, idxGender));
+      const ttl = parseTTL(cell(raw, idxTTL));
+      const endDate = parseDateID(cell(raw, idxEnd));
+      const asimDate = parseDateID(cell(raw, idxAsim));
+      const intDate = parseDateID(cell(raw, idxInt));
+      const startDate = asimDate || intDate;
+      const statusVal = normStatus(cell(raw, idxStatus));
+
       const sheetRowNum = headerRowIdx + 2 + i;
-      if (!case_number && !full_name && !pkNameRaw) continue; // skip empty row silently
+      const hasAny = case_number || full_name || pkNameRaw || addressVal || phoneVal || genderVal || ttl.place || ttl.date || endDate || startDate || statusVal;
+      if (!hasAny) continue; // skip empty row silently
 
       if (!case_number || !full_name) {
         r.errors.push(`Baris ${sheetRowNum}: No. Litmas & Nama Lengkap wajib`); continue;
       }
-
 
       const { data: existingClient } = await admin
         .from("clients").select("id, user_id").eq("case_number", case_number).maybeSingle();
@@ -188,12 +294,24 @@ Deno.serve(async (req): Promise<Response> => {
         }
       }
 
-      await admin.from("profiles").update({ full_name }).eq("user_id", existingClient.user_id);
+      // Build profile patch — only set fields with non-empty values
+      const profilePatch: any = { full_name };
+      if (addressVal) profilePatch.address = addressVal;
+      if (phoneVal) profilePatch.phone = phoneVal;
+      if (genderVal) profilePatch.gender = genderVal;
+      if (ttl.place) profilePatch.birth_place = ttl.place;
+      if (ttl.date) profilePatch.birth_date = ttl.date;
+      await admin.from("profiles").update(profilePatch).eq("user_id", existingClient.user_id);
+
       const clientPatch: any = { case_number };
       if (assigned_pk_id !== null || !pkName) clientPatch.assigned_pk_id = assigned_pk_id;
+      if (endDate) clientPatch.guidance_end = endDate;
+      if (startDate) clientPatch.guidance_start = startDate;
+      if (statusVal) clientPatch.client_status = statusVal;
       await admin.from("clients").update(clientPatch).eq("id", existingClient.id);
       r.updated++;
     }
+
 
     return json({ ok: true, results: { clients: r } });
   } catch (e) {
