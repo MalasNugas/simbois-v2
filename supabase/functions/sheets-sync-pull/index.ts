@@ -184,7 +184,7 @@ Deno.serve(async (req): Promise<Response> => {
       if (pkName) {
         assigned_pk_id = pegByName.get(pkName) || null;
         if (!assigned_pk_id) {
-          r.errors.push(`Baris ${i + 2} (${case_number}): Pegawai PK "${pkNameRaw}" tidak ditemukan — kolom lain tetap di-update.`);
+          r.errors.push(`Baris ${sheetRowNum} (${case_number}): Pegawai PK "${pkNameRaw}" tidak ditemukan — kolom lain tetap di-update.`);
         }
       }
 
