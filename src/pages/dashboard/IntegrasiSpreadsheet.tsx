@@ -5,21 +5,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Loader2, RefreshCw, Save, Upload, Download, PlugZap, ExternalLink, AlertTriangle } from 'lucide-react';
+import { Loader2, RefreshCw, Save, Download, PlugZap, ExternalLink, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
-import { format } from 'date-fns';
-
-const DB_FIELDS = {
-  clients: ['id', 'full_name', 'case_number', 'phone', 'assigned_pk_name', 'address', 'status', 'created_at'],
-  reports: ['id', 'client_name', 'case_number', 'report_year', 'report_month', 'job_status', 'lat', 'lng', 'submitted_via', 'created_at'],
-  permissions: ['id', 'client_name', 'case_number', 'pegawai_name', 'period_year', 'period_month', 'granted_at', 'revoked_at', 'note'],
-} as const;
-
-type Tab = { title: string; sheetId: number; headers: string[] };
 
 function extractSpreadsheetId(input: string): string {
   if (!input) return '';
@@ -33,28 +21,14 @@ export default function IntegrasiSpreadsheet() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
-  const [syncing, setSyncing] = useState(false);
   const [pulling, setPulling] = useState(false);
   const [creatingTabs, setCreatingTabs] = useState(false);
   const [pullResult, setPullResult] = useState<any>(null);
-  const [pullOpts, setPullOpts] = useState({ pegawai: true, clients: true, reports: false });
-  const [tabsLoading, setTabsLoading] = useState(false);
   const [canWrite, setCanWrite] = useState<boolean | null>(null);
   const [writeError, setWriteError] = useState<string | null>(null);
 
-
-
-
   const [settings, setSettings] = useState<any>(null);
   const [urlInput, setUrlInput] = useState('');
-  const [tabs, setTabs] = useState<Tab[]>([]);
-  const [clientsTab, setClientsTab] = useState('');
-  const [reportsTab, setReportsTab] = useState('');
-  const [permsTab, setPermsTab] = useState('');
-  const [mapping, setMapping] = useState<Record<string, Record<string, string>>>({
-    clients: {}, reports: {}, permissions: {},
-  });
-  const [autoSync, setAutoSync] = useState(false);
 
   useEffect(() => {
     if (authLoading) return;
@@ -68,26 +42,8 @@ export default function IntegrasiSpreadsheet() {
     if (data) {
       setSettings(data);
       setUrlInput(data.spreadsheet_url || `https://docs.google.com/spreadsheets/d/${data.spreadsheet_id}`);
-      setClientsTab(data.clients_sheet_name);
-      setReportsTab(data.reports_sheet_name);
-      setPermsTab(data.permissions_sheet_name);
-      setMapping((data.column_mapping as any) || { clients: {}, reports: {}, permissions: {} });
-      setAutoSync(data.auto_sync);
-      await fetchTabs(data.spreadsheet_id);
     }
     setLoading(false);
-  };
-
-  const fetchTabs = async (spreadsheetId: string) => {
-    if (!spreadsheetId) return;
-    setTabsLoading(true);
-    const { data, error } = await supabase.functions.invoke('sheets-list-tabs', { body: { spreadsheet_id: spreadsheetId } });
-    setTabsLoading(false);
-    if (error || (data as any)?.error) {
-      toast.error((data as any)?.error || error?.message || 'Gagal memuat tab');
-      return;
-    }
-    setTabs((data as any).tabs || []);
   };
 
   const handleTest = async () => {
@@ -106,13 +62,11 @@ export default function IntegrasiSpreadsheet() {
     setCanWrite(!!d.can_write);
     setWriteError(d.write_error || null);
     if (d.can_write) {
-      toast.success(`Terhubung sebagai Editor: ${d.title} (${d.sheet_count} tab)`);
+      toast.success(`Terhubung sebagai Editor: ${d.title}`);
     } else {
       toast.warning(`Terhubung tapi BUKAN Editor: ${d.title}. Share sebagai Editor dulu.`);
     }
-    await fetchTabs(id);
   };
-
 
   const handleSave = async () => {
     const spreadsheet_id = extractSpreadsheetId(urlInput);
@@ -121,11 +75,11 @@ export default function IntegrasiSpreadsheet() {
     const payload = {
       spreadsheet_id,
       spreadsheet_url: urlInput,
-      clients_sheet_name: clientsTab || 'Clients',
-      reports_sheet_name: reportsTab || 'WajibLapor',
-      permissions_sheet_name: permsTab || 'Permissions',
-      column_mapping: mapping,
-      auto_sync: autoSync,
+      clients_sheet_name: 'Clients Import',
+      reports_sheet_name: 'WajibLapor',
+      permissions_sheet_name: 'Permissions',
+      column_mapping: {},
+      auto_sync: false,
     };
     let res;
     if (settings?.id) {
@@ -139,29 +93,10 @@ export default function IntegrasiSpreadsheet() {
     toast.success('Pengaturan disimpan');
   };
 
-  const handlePush = async () => {
-    if (!settings?.id) { toast.error('Simpan pengaturan dulu'); return; }
-    setSyncing(true);
-    const { data, error } = await supabase.functions.invoke('sheets-sync-push', { body: {} });
-    setSyncing(false);
-    if (error || (data as any)?.error) {
-      toast.error((data as any)?.error || error?.message || 'Sinkronisasi gagal');
-    } else {
-      toast.success('Data berhasil dikirim ke Spreadsheet');
-    }
-    await load();
-  };
-
   const extractFnError = async (error: any, data: any) => {
     if (data?.error) return data.error;
-    try {
-      const body = await error?.context?.json?.();
-      if (body?.error) return body.error;
-    } catch { /* ignore */ }
-    try {
-      const txt = await error?.context?.text?.();
-      if (txt) return txt;
-    } catch { /* ignore */ }
+    try { const body = await error?.context?.json?.(); if (body?.error) return body.error; } catch { /* */ }
+    try { const txt = await error?.context?.text?.(); if (txt) return txt; } catch { /* */ }
     return error?.message || 'Terjadi kesalahan';
   };
 
@@ -173,25 +108,15 @@ export default function IntegrasiSpreadsheet() {
     if (error || (data as any)?.error) {
       toast.error(await extractFnError(error, data));
     } else {
-      toast.success('Template tab berhasil dibuat di spreadsheet');
+      toast.success('Template tab "Clients Import" siap di spreadsheet');
     }
   };
 
-
-
   const handlePull = async () => {
-
     if (!settings?.id) { toast.error('Simpan pengaturan dulu'); return; }
-    if (!pullOpts.pegawai && !pullOpts.clients && !pullOpts.reports) {
-      toast.error('Pilih minimal satu tab untuk di-import'); return;
-    }
-    const ok = window.confirm(
-      'Import akan membuat akun login dari Spreadsheet.\n\nPastikan tab dan kolom (Email, Password Awal, No. Litmas) sudah benar.\n\nLanjutkan?'
-    );
-    if (!ok) return;
     setPulling(true);
     setPullResult(null);
-    const { data, error } = await supabase.functions.invoke('sheets-sync-pull', { body: pullOpts });
+    const { data, error } = await supabase.functions.invoke('sheets-sync-pull', { body: {} });
     setPulling(false);
     if (error || (data as any)?.error) {
       toast.error((data as any)?.error || error?.message || 'Import gagal');
@@ -201,29 +126,21 @@ export default function IntegrasiSpreadsheet() {
     }
   };
 
-
-  const updateMap = (group: keyof typeof DB_FIELDS, field: string, header: string) => {
-    setMapping((m) => ({ ...m, [group]: { ...(m[group] || {}), [field]: header === '__none__' ? '' : header } }));
-  };
-
-  const headersFor = (tabName: string) => tabs.find((t) => t.title === tabName)?.headers || [];
-
   if (authLoading || loading) {
     return <div className="min-h-screen pt-20 flex items-center justify-center"><Loader2 className="w-6 h-6 animate-spin" /></div>;
   }
 
   return (
     <div className="min-h-screen pt-20 pb-12 px-4">
-      <div className="container mx-auto max-w-5xl space-y-6">
+      <div className="container mx-auto max-w-3xl space-y-6">
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
             <h1 className="text-2xl md:text-3xl font-bold">Integrasi Spreadsheet</h1>
-            <p className="text-sm text-muted-foreground">Pengaturan sinkronisasi data Wajib Lapor ke Google Sheets</p>
+            <p className="text-sm text-muted-foreground">Import data Client (Nama, No. Litmas, Pegawai PK) dari Google Sheets</p>
           </div>
           <Button variant="outline" onClick={() => navigate('/dashboard/admin')}>← Kembali ke Dashboard</Button>
         </div>
 
-        {/* Connector status */}
         <div className="glass-card rounded-2xl p-6">
           <div className="flex items-center justify-between flex-wrap gap-3">
             <div className="flex items-center gap-3">
@@ -236,11 +153,10 @@ export default function IntegrasiSpreadsheet() {
             <Badge variant="secondary">Terhubung</Badge>
           </div>
           <p className="text-xs text-muted-foreground mt-3">
-            <strong>Penting:</strong> share Spreadsheet target ke akun Google connector dengan akses <em>Editor</em> agar push berhasil.
+            <strong>Penting:</strong> share Spreadsheet target ke akun Google connector dengan akses <em>Editor</em>.
           </p>
         </div>
 
-        {/* Spreadsheet target */}
         <div className="glass-card rounded-2xl p-6 space-y-4">
           <h2 className="font-semibold">Spreadsheet Target</h2>
           <div className="space-y-2">
@@ -250,7 +166,7 @@ export default function IntegrasiSpreadsheet() {
                 placeholder="https://docs.google.com/spreadsheets/d/..." className="flex-1 min-w-[260px]" />
               <Button onClick={handleTest} disabled={testing} variant="outline">
                 {testing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-                <span className="ml-2">Test & Muat Tab</span>
+                <span className="ml-2">Test Akses</span>
               </Button>
             </div>
             {urlInput && (
@@ -265,8 +181,7 @@ export default function IntegrasiSpreadsheet() {
               <AlertTriangle className="w-4 h-4 text-destructive shrink-0 mt-0.5" />
               <div className="space-y-1">
                 <p className="font-semibold text-destructive">Akun connector Google belum punya akses Editor.</p>
-                <p>Buka spreadsheet di Google Sheets → klik <strong>Share</strong> → tambahkan email akun Google yang dipakai connector (lihat di Lovable → Connectors → Google Sheets) sebagai <strong>Editor</strong>, lalu klik <strong>Test & Muat Tab</strong> lagi.</p>
-                <p className="text-muted-foreground">Tombol Push, Tarik dari Sheet, dan Buat Template Tab di-nonaktifkan sampai akses Editor diberikan.</p>
+                <p>Buka spreadsheet → <strong>Share</strong> → tambahkan email akun connector sebagai <strong>Editor</strong>, lalu klik <strong>Test Akses</strong> lagi.</p>
                 {writeError && <p className="text-muted-foreground break-all">Detail: {writeError}</p>}
               </div>
             </div>
@@ -276,97 +191,33 @@ export default function IntegrasiSpreadsheet() {
               ✓ Akses Editor terverifikasi — semua aksi tersedia.
             </div>
           )}
+
+          <Button onClick={handleSave} disabled={saving} className="gap-2">
+            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Simpan Pengaturan
+          </Button>
         </div>
 
-
-        {/* Tabs yang akan dibuat otomatis */}
-        <div className="glass-card rounded-2xl p-6 space-y-3">
-          <h2 className="font-semibold">Struktur Data (6 Tab Otomatis)</h2>
-          <p className="text-sm text-muted-foreground">
-            Saat "Push Sekarang" ditekan, sistem otomatis membuat tab berikut di spreadsheet bila belum ada,
-            dan mengisinya dengan data terkini. Header sudah dalam Bahasa Indonesia.
-          </p>
-          <ul className="grid sm:grid-cols-2 gap-2 text-sm">
-            {[
-              { name: 'Clients', desc: 'Data lengkap klien + Pegawai PK yang ditugaskan' },
-              { name: 'Wajib Lapor', desc: 'Riwayat lapor + Pegawai PK + hari ke-berapa + status lokasi' },
-              { name: 'Izin Lapor', desc: 'Izin lapor yang diberikan Pegawai PK' },
-              { name: 'Pegawai PK', desc: 'Daftar pegawai + klien aktif/selesai + sudah/belum lapor' },
-              { name: 'Rekap Bulanan', desc: 'Agregasi 12 bulan terakhir' },
-              { name: 'Tracking Lokasi', desc: '1000 titik GPS terbaru (geofencing Malang)' },
-              { name: 'Lapor Harian', desc: '30 hari terakhir: total lapor & % kepatuhan per hari' },
-              { name: 'Kepatuhan Klien', desc: 'Per-klien: sudah/belum lapor bulan ini + hari sejak terakhir' },
-              { name: 'Kinerja Pegawai PK', desc: 'KPI kepatuhan klien per pegawai (bulan berjalan)' },
-
-            ].map((t) => (
-              <li key={t.name} className="flex gap-2 p-2 rounded-lg bg-muted/30">
-                <Badge variant="outline" className="shrink-0">{t.name}</Badge>
-                <span className="text-xs text-muted-foreground">{t.desc}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        {/* Sync controls */}
-        <div className="glass-card rounded-2xl p-6 space-y-4">
-          <h2 className="font-semibold">Sinkronisasi</h2>
-          <div className="flex items-center gap-3">
-            <Switch checked={autoSync} onCheckedChange={setAutoSync} id="auto" />
-            <Label htmlFor="auto" className="cursor-pointer">Auto-sync (akan aktif setelah cron diaktifkan)</Label>
-          </div>
-          {settings?.last_sync_at && (
-            <div className="text-sm space-y-1">
-              <p>Terakhir sync: <span className="text-muted-foreground">{format(new Date(settings.last_sync_at), 'dd MMM yyyy HH:mm')}</span></p>
-              <p>Status: <Badge variant={settings.last_sync_status === 'success' ? 'default' : 'destructive'}>{settings.last_sync_status}</Badge></p>
-              {settings.last_sync_error && <p className="text-xs text-destructive break-all">{settings.last_sync_error}</p>}
-            </div>
-          )}
-          <div className="flex gap-2 flex-wrap">
-            <Button onClick={handleSave} disabled={saving} className="gap-2">
-              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Simpan Pengaturan
-            </Button>
-            <Button onClick={handlePush} disabled={syncing || !settings?.id || canWrite === false} variant="secondary" className="gap-2">
-              {syncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />} Push Sekarang
-            </Button>
-
-          </div>
-        </div>
-
-        {/* Import (Pull) from Sheet → DB */}
         <div className="glass-card rounded-2xl p-6 space-y-4">
           <div className="flex items-center gap-2">
             <Download className="w-5 h-5 text-primary" />
-            <h2 className="font-semibold">Tarik dari Spreadsheet (Import ke Database)</h2>
+            <h2 className="font-semibold">Import Client dari Spreadsheet</h2>
           </div>
           <div className="text-sm text-muted-foreground space-y-2">
-            <p>Buat tab berikut di spreadsheet dengan kolom yang dibutuhkan, lalu klik <strong>Tarik dari Sheet</strong>:</p>
+            <p>Buat tab <strong>Clients Import</strong> di spreadsheet dengan 3 kolom berikut, lalu klik <strong>Tarik dari Sheet</strong>:</p>
+            <div className="text-xs p-3 rounded-lg bg-muted/30 font-mono">
+              No. Litmas | Nama Lengkap | Pegawai PK
+            </div>
             <ul className="text-xs space-y-1 pl-4 list-disc">
-              <li><strong>Pegawai PK Import</strong>: <code>Nama Pegawai | Email | Password Awal | Telepon</code></li>
-              <li><strong>Clients Import</strong>: <code>No. Litmas | Nama Lengkap | Email | Password Awal | Jenis Kelamin | Tempat Lahir | Tgl Lahir | Telepon | Alamat | Status Bimbingan | Status Pekerjaan | Detail Pekerjaan | Mulai Bimbingan | Akhir Bimbingan | Pegawai PK</code></li>
-              <li><strong>Wajib Lapor Import</strong> (opsional): <code>No. Litmas | Periode (YYYY-MM) | Tanggal Lapor | Status Pekerjaan | Status Operasional | Latitude | Longitude | Catatan</code></li>
+              <li><strong>No. Litmas</strong> dipakai untuk mencocokkan klien yang sudah ada.</li>
+              <li><strong>Nama Lengkap</strong> akan meng-update nama profil klien.</li>
+              <li><strong>Pegawai PK</strong> diisi nama lengkap pegawai (harus sudah punya akun pegawai di sistem).</li>
             </ul>
           </div>
           <div className="flex items-start gap-2 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/30 text-xs">
             <AlertTriangle className="w-4 h-4 text-yellow-500 shrink-0 mt-0.5" />
-            <span>Setelah import berhasil, <strong>hapus kolom Password Awal</strong> dari spreadsheet untuk keamanan. Mode upsert: data dengan No. Litmas/Email yang sama akan di-update, bukan diduplikasi.</span>
+            <span>Import ini hanya meng-update klien yang sudah ada. Untuk klien baru, tambahkan lewat dashboard admin terlebih dahulu (butuh akun login).</span>
           </div>
-          <div className="grid sm:grid-cols-3 gap-3">
-            {[
-              { key: 'pegawai', label: 'Pegawai PK Import' },
-              { key: 'clients', label: 'Clients Import' },
-              { key: 'reports', label: 'Wajib Lapor Import' },
-            ].map((opt) => (
-              <label key={opt.key} className="flex items-center gap-2 p-3 rounded-lg bg-muted/30 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={(pullOpts as any)[opt.key]}
-                  onChange={(e) => setPullOpts({ ...pullOpts, [opt.key]: e.target.checked })}
-                  className="w-4 h-4"
-                />
-                <span className="text-sm">{opt.label}</span>
-              </label>
-            ))}
-          </div>
+
           <div className="flex gap-2 flex-wrap">
             <Button onClick={handleCreateTemplate} disabled={creatingTabs || !settings?.id || canWrite === false} variant="outline" className="gap-2">
               {creatingTabs ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />} Buat Template Tab
@@ -374,7 +225,6 @@ export default function IntegrasiSpreadsheet() {
             <Button onClick={handlePull} disabled={pulling || !settings?.id || canWrite === false} variant="secondary" className="gap-2">
               {pulling ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />} Tarik dari Sheet
             </Button>
-
           </div>
 
           {pullResult && (
@@ -397,7 +247,6 @@ export default function IntegrasiSpreadsheet() {
           )}
         </div>
       </div>
-
     </div>
   );
 }
