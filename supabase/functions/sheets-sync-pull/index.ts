@@ -58,6 +58,9 @@ Deno.serve(async (req): Promise<Response> => {
 
     const body = await req.json().catch(() => ({}));
     const requestedTab = (body.clients_tab || "").trim();
+    const headerRowOverride = Number.isFinite(Number(body.header_row)) && Number(body.header_row) > 0
+      ? Math.floor(Number(body.header_row))
+      : 0;
 
     const { data: settings } = await admin
       .from("sheet_integration_settings").select("*").limit(1).maybeSingle();
@@ -86,10 +89,10 @@ Deno.serve(async (req): Promise<Response> => {
     }
 
 
-    // 2. Fetch values for the chosen tab
+    // 2. Fetch values for the chosen tab (wider range so we can locate header row)
     let values: string[][] = [];
     try {
-      const range = `${quoteTab(tabUsed)}!A:Z`;
+      const range = `${quoteTab(tabUsed)}!A1:Z2000`;
       const res = await gatewayFetch(
         `/spreadsheets/${sid}/values:batchGet?ranges=${encodeURIComponent(range)}`,
       );
@@ -99,23 +102,48 @@ Deno.serve(async (req): Promise<Response> => {
       return json({ ok: true, results: { clients: { created: 0, updated: 0, skipped: 0, errors: [formatSheetsImportError(e)], tab_used: tabUsed, available_tabs: availableTabs } } });
     }
 
-    const r: any = { created: 0, updated: 0, skipped: 0, errors: [] as string[], tab_used: tabUsed, available_tabs: availableTabs, rows_read: Math.max(0, values.length - 1) };
+    const r: any = { created: 0, updated: 0, skipped: 0, errors: [] as string[], tab_used: tabUsed, available_tabs: availableTabs, rows_read: 0 };
 
     if (values.length < 2) {
       r.errors.push(`Tab "${tabUsed}" kosong atau hanya berisi header. Tambahkan data mulai baris 2. Tab tersedia: ${availableTabs.join(", ") || "(tidak ada)"}.`);
       return json({ ok: true, results: { clients: r } });
     }
 
-    const headers = values[0].map((h) => String(h || "").trim());
+    // Locate header row: override wins, else scan first 15 rows for a row recognizing both case_number & full_name
+    let headerRowIdx = -1;
+    if (headerRowOverride > 0 && headerRowOverride <= values.length) {
+      headerRowIdx = headerRowOverride - 1;
+    } else {
+      const scanLimit = Math.min(15, values.length);
+      for (let i = 0; i < scanLimit; i++) {
+        const row = (values[i] || []).map((h) => String(h || "").trim());
+        if (!row.some((c) => c)) continue;
+        const c = pickHeaderIndex(row, HEADER_ALIASES.case_number);
+        const n = pickHeaderIndex(row, HEADER_ALIASES.full_name);
+        if (c >= 0 && n >= 0) { headerRowIdx = i; break; }
+      }
+    }
+
+    if (headerRowIdx < 0) {
+      const preview = values.slice(0, 10)
+        .map((row, i) => `Baris ${i + 1}: [${(row || []).map((c) => String(c || "").trim()).filter(Boolean).slice(0, 8).join(" | ") || "(kosong)"}]`)
+        .join(" ; ");
+      r.errors.push(`Tidak menemukan baris header di tab "${tabUsed}". 10 baris teratas: ${preview}. Isi field "Baris header" dengan nomor baris yang berisi judul kolom (mis. 1, 2, atau 3).`);
+      return json({ ok: true, results: { clients: r } });
+    }
+
+    const headers = (values[headerRowIdx] || []).map((h) => String(h || "").trim());
     r.headers_found = headers;
+    r.header_row = headerRowIdx + 1;
     const idxCase = pickHeaderIndex(headers, HEADER_ALIASES.case_number);
     const idxName = pickHeaderIndex(headers, HEADER_ALIASES.full_name);
     const idxPk = pickHeaderIndex(headers, HEADER_ALIASES.pk_name);
 
     if (idxCase < 0 || idxName < 0) {
-      r.errors.push(`Header tidak dikenali pada tab "${tabUsed}". Ditemukan: [${headers.join(" | ")}]. Wajib ada kolom "No. Litmas" dan "Nama Lengkap" (opsional: "Pegawai PK").`);
+      r.errors.push(`Header tidak dikenali pada tab "${tabUsed}" (baris ${headerRowIdx + 1}). Ditemukan: [${headers.join(" | ")}]. Wajib ada kolom "No. Litmas" dan "Nama Lengkap" (opsional: "Pegawai PK").`);
       return json({ ok: true, results: { clients: r } });
     }
+
 
     // Lookup pegawai by full_name (case-insensitive)
     const { data: pegProfiles } = await admin.from("profiles").select("user_id, full_name");
