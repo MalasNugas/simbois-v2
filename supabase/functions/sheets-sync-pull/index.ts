@@ -69,11 +69,11 @@ const parsePeriode = (s: string): { year: number; month: number } | null => {
   return null;
 };
 
-Deno.serve(async (req) => {
+Deno.serve(async (req): Promise<Response> => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   try {
     const auth = await requireAdmin(req);
-    if ("error" in auth) return auth.error;
+    if ("error" in auth) return auth.error as Response;
     const admin = auth.admin;
 
     const body = await req.json().catch(() => ({}));
