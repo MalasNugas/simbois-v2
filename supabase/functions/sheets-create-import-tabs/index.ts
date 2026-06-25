@@ -2,16 +2,7 @@
 import { corsHeaders, json, requireAdmin, gatewayFetch } from "../_shared/sheets.ts";
 
 const TEMPLATES: Record<string, string[]> = {
-  "Pegawai PK Import": ["Nama Pegawai", "Email", "Password Awal", "Telepon"],
-  "Clients Import": [
-    "No. Litmas", "Nama Lengkap", "Email", "Password Awal", "Jenis Kelamin",
-    "Tempat Lahir", "Tgl Lahir", "Telepon", "Alamat", "Status Bimbingan",
-    "Status Pekerjaan", "Detail Pekerjaan", "Mulai Bimbingan", "Akhir Bimbingan", "Pegawai PK",
-  ],
-  "Wajib Lapor Import": [
-    "No. Litmas", "Periode", "Tanggal Lapor", "Status Pekerjaan",
-    "Status Operasional", "Latitude", "Longitude", "Catatan",
-  ],
+  "Clients Import": ["No. Litmas", "Nama Lengkap", "Pegawai PK"],
 };
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));

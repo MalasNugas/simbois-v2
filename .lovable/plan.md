@@ -1,33 +1,63 @@
-## Pre-check akses Editor sebelum tombol "Buat Template Tab" & "Tarik dari Sheet" aktif
+## Tujuan
 
-### Masalah
-Connector Google saat ini hanya punya akses Viewer/Commenter ke spreadsheet target, sehingga `batchUpdate` (membuat tab) dan `values.update` (menulis header / pull yang butuh tulis) gagal dengan **403 PERMISSION_DENIED**. User baru tahu setelah klik tombol dan menunggu error.
+Integrasi Google Sheets disederhanakan: hanya untuk **import Client** dengan kolom inti. Flow utama aplikasi (search Client → PK kasih izin → Wajib Lapor → admin pantau) sudah berjalan dan hanya diverifikasi, bukan diubah.
 
-### Solusi
-Tambahkan probe akses ringan saat user klik **Test Koneksi**. Jika akun connector bukan Editor, tombol aksi tulis di-disable dan ditampilkan instruksi share sebagai Editor.
+## Yang Diubah
 
-### Perubahan
+### 1. Halaman `IntegrasiSpreadsheet.tsx` — disederhanakan drastis
 
-**1. Edge function baru: `supabase/functions/sheets-check-access/index.ts`**
-- Admin-only, input: `{ spreadsheet_id }`.
-- Cara cek (tanpa mengubah data): panggil `spreadsheets/{id}?fields=spreadsheetId,properties.title` lalu `spreadsheets:batchUpdate` dengan body kosong `{ requests: [] }`.
-  - Google membalas 200 jika punya akses tulis, 403 jika hanya read.
-- Return: `{ can_write: boolean, reason?: string, connector_email?: string }`.
-  - Untuk `connector_email`, coba ambil dari `oauth2/v2/userinfo` via gateway (best-effort, boleh kosong).
+**Hapus dari UI:**
+- Section "Struktur Data (6 Tab Otomatis)" — daftar 9 tab dihapus.
+- Checkbox "Pegawai PK Import" dan "Wajib Lapor Import".
+- Tombol "Push Sekarang" + toggle Auto-sync (push ke sheet tidak dipakai sekarang).
+- State & helper terkait push/pegawai/reports import.
 
-**2. Update `supabase/functions/sheets-test-connection/index.ts`**
-- Setelah berhasil ambil metadata, panggil probe write yang sama (`batchUpdate` body kosong) dan kembalikan `can_write` di response.
+**Sisakan:**
+- Connector status card.
+- Input URL spreadsheet + tombol **Test & Muat Tab** (tetap dipakai untuk validasi akses Editor).
+- Banner pre-check akses Editor (hijau/merah) — sudah ada.
+- Section **Import Client** dengan:
+  - Penjelasan kolom yang dibutuhkan (3 kolom saja, lihat di bawah).
+  - Tombol **Buat Template Tab "Clients Import"**.
+  - Tombol **Tarik dari Sheet**.
+  - Ringkasan hasil import.
+- Tombol Simpan Pengaturan (tetap, untuk simpan spreadsheet_id).
 
-**3. Update `src/pages/dashboard/IntegrasiSpreadsheet.tsx`**
-- State baru: `canWrite: boolean | null`, `connectorEmail: string | null`.
-- `handleTest()` simpan `can_write` dari response.
-- Disable tombol **Buat Template Tab**, **Tarik dari Sheet**, dan **Push ke Sheet** saat `canWrite === false`.
-- Tampilkan banner peringatan merah di panel ketika `canWrite === false`:
-  > "Akun connector Google belum punya akses **Editor** ke spreadsheet ini. Buka spreadsheet → Share → tambahkan email connector sebagai **Editor**, lalu klik **Test Koneksi** lagi."
-  > (Jika `connectorEmail` tersedia, tampilkan emailnya + tombol copy.)
-- Banner hijau singkat saat `canWrite === true`.
+### 2. Edge function `sheets-create-import-tabs/index.ts`
 
-### Yang TIDAK berubah
-- Tidak ada perubahan DB / RLS / tabel.
-- Logic push/pull/template tetap sama; hanya gating UI + probe.
-- Tetap pertahankan error handling 403 di edge function existing sebagai jaring pengaman.
+Hanya membuat satu tab **`Clients Import`** dengan header:
+
+```
+No. Litmas | Nama Lengkap | Pegawai PK
+```
+
+Tab `Pegawai PK Import` dan `Wajib Lapor Import` tidak lagi dibuat.
+
+### 3. Edge function `sheets-sync-pull/index.ts`
+
+- Selalu pakai tab `Clients Import` saja. Hapus cabang `importPegawai` dan `importReports`.
+- Body request tidak perlu opsi tab — paksa hanya import Client.
+- Untuk tiap baris:
+  - Baca **No. Litmas**, **Nama Lengkap**, **Pegawai PK**.
+  - Cari client existing by `case_number` → update `full_name` di `profiles` + `assigned_pk_id` di `clients`.
+  - Bila client belum ada → skip dengan pesan error "Klien baru tidak bisa dibuat dari Sheet (butuh akun login). Tambah klien lewat dashboard admin dulu."
+  - `assigned_pk_id` di-resolve dari nama Pegawai PK (case-insensitive) ke `profiles.user_id` yang punya role `pegawai`. Bila nama tidak ditemukan → tetap update kolom lain, error baris dicatat.
+- Hapus pembuatan auth user, `auth.admin.listUsers`, `user_roles` insert untuk impor — tidak relevan lagi.
+
+### 4. Verifikasi flow utama (tidak diubah, hanya dicek)
+
+- `search_clients_public` RPC sudah return `full_name`, `case_number`, `assigned_pk_name` → `WajibLapor.tsx` sudah menampilkan ketiganya sebagai pembeda saat ada nama sama. ✅
+- `PegawaiDashboard.tsx` sudah punya tombol grant/revoke izin per bulan via tabel `reporting_permissions`. ✅
+- `AdminDashboard.tsx` sudah load `reporting_permissions` + laporan harian untuk monitoring. ✅
+
+## Yang TIDAK Diubah
+
+- Skema database, RLS, tabel `clients/profiles/user_roles/reporting_permissions/monthly_reports`.
+- `submit-wajib-lapor` edge function.
+- Halaman `WajibLapor.tsx`, `PegawaiDashboard.tsx`, `AdminDashboard.tsx`.
+- Connector Google Sheets — tetap dipakai, hanya scope penggunaannya dikecilkan.
+
+## Catatan untuk Anda
+
+- Pembuatan **akun login Klien & Pegawai PK** tetap dilakukan dari dashboard Admin (bukan dari Sheet). Sheet hanya untuk update massal **No. Litmas + Nama + Pegawai PK** pada klien yang sudah ada.
+- Bila nanti Anda ingin Sheet juga buat akun baru, itu fitur tambahan terpisah — kabari saja.
