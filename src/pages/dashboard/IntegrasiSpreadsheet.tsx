@@ -120,7 +120,9 @@ export default function IntegrasiSpreadsheet() {
     if (!settings?.id) { toast.error('Simpan pengaturan dulu'); return; }
     setPulling(true);
     setPullResult(null);
-    const { data, error } = await supabase.functions.invoke('sheets-sync-pull', { body: { clients_tab: clientsTab.trim() || undefined } });
+    const hr = parseInt(headerRow, 10);
+    const { data, error } = await supabase.functions.invoke('sheets-sync-pull', { body: { clients_tab: clientsTab.trim() || undefined, header_row: Number.isFinite(hr) && hr > 0 ? hr : undefined } });
+
 
     setPulling(false);
     if (error || (data as any)?.error) {
