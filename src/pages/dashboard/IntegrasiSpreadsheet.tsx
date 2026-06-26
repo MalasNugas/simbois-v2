@@ -224,8 +224,8 @@ export default function IntegrasiSpreadsheet() {
             <div className="space-y-2">
               <Label htmlFor="clients-tab">Tab sumber klien (opsional)</Label>
               <Input id="clients-tab" value={clientsTab} onChange={(e) => setClientsTab(e.target.value)}
-                placeholder="Kosongkan = auto-detect MASTER DATA" />
-              <p className="text-xs text-muted-foreground">Isi nama tab persis jika ingin override (mis. "Copy of MASTER DATA").</p>
+                placeholder="Contoh: MASTERDATA atau MASTER DATA" />
+              <p className="text-xs text-muted-foreground">Isi nama tab persis yang berisi data klien aktual (mis. <code>MASTERDATA</code> atau <code>Copy of MASTER DATA</code>). Hindari tab kosong/template.</p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="header-row">Baris header (opsional)</Label>

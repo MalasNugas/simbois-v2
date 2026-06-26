@@ -1,61 +1,37 @@
-## Tujuan
+## Diagnosis
 
-Tetap update-only (tidak buat klien baru). Tambahkan impor kolom MASTER DATA tambahan ke field yang **sudah ada** di DB. Tidak ada perubahan schema.
+Saya cek isi spreadsheet langsung:
 
-## Mapping kolom MASTER DATA → DB
+- Tab **`MASTER DATA`** (yang sedang dipakai) → header di baris 3, **0 baris data**. Itu sebabnya hasil 0/0/0.
+- Tab **`MASTERDATA`** → header di baris 1, **berisi data klien LP MALANG/PASURUAN**. Ini yang akan dipakai.
 
-**profiles** (update via `user_id` klien yang sudah ada):
-- `NAMA` → `full_name`
-- `ALAMAT` → `address`
-- `NO TELEPON` → `phone`
-- `JENIS KELAMIN` → `gender` (normalisasi: L/Laki-laki → `laki-laki`, P/Perempuan → `perempuan`)
-- `TEMPAT TANGGAL LAHIR` → split jadi `birth_place` + `birth_date`
-  - Parse pola `"Malang, 12/05/1990"` atau `"Malang, 12-05-1990"` atau `"Malang 12 Mei 1990"`. Kalau gagal parse tanggal → simpan seluruh string ke `birth_place`, kosongkan `birth_date`.
+Contoh header MASTERDATA:
+`NO | TANGGAL INPUT | NO REG | UPT | NAMA LENGKAP | TEMPAT TANGGAL LAHIR | JENIS KELAMIN | ALAMAT | KOTA KAB | NO TELEPON | PEKERJAAN | TINDAK PIDANA | TGL ASIMILASI | TGL INTEGRASI | JENIS BIMBINGAN | NO TANGGAL SK | LAMA PIDANA | TGL PENGAKHIRAN | ALIH STATUS KE | PK | STATUS SK | STATUS BIMBINGAN | STATUS KLIEN | ... | KETERANGAN`
 
-**clients** (update via `case_number`):
-- `NO. REG` → `case_number` (key pencarian)
-- `PK` → `assigned_pk_id` (lookup existing — perilaku saat ini dipertahankan)
-- `PENGAKHIRAN BIMBINGAN` → `guidance_end` (parse dd/mm/yyyy)
-- `TANGGAL ASIMILASI` atau `TANGGAL INTEGRASI` → `guidance_start` (ambil yang terisi; kalau dua-duanya ada, prioritas ASIMILASI)
-- `STATUS` → `client_status` (lowercase, ambil token pertama: `aktif` / `berakhir` / `pencabutan` / `meninggal_dunia` / `dilimpahkan`)
+Sebagian besar alias sudah cocok (NO REG, NAMA LENGKAP, TEMPAT TANGGAL LAHIR, JENIS KELAMIN, ALAMAT, NO TELEPON, TGL ASIMILASI, TGL INTEGRASI, TGL PENGAKHIRAN, PK). Tapi ada 2 masalah:
 
-Kolom MASTER DATA yang **tidak dipetakan** (tidak ada field DB-nya, akan diabaikan tanpa error): `NO`, `TANGGAL INPUT`, `ASAL UPT`, `KOTA`, `TINDAK PIDANA`, `JENIS BIMBINGAN`, `NO DAN TANGGAL SK`, `LAMA PIDANA`, `STATUS SK INTEGRASI`, `KETERANGAN`.
+1. **STATUS** ambigu — ada 3 kolom: `STATUS SK`, `STATUS BIMBINGAN`, `STATUS KLIEN`. Alias saat ini (`"status"`) akan match `STATUS SK` lebih dulu (kolom pertama yang mengandung kata "status") dan menyimpan nilai `ADA`/`TIDAK ADA` ke `client_status`, padahal yang benar **`STATUS KLIEN`** (nilai: AKTIF/BERAKHIR/dll).
+2. **NO TELEPON** kadang berisi karakter tab di depan (`"\t081347..."`) — sudah di-`trim()` jadi aman, tapi worth disebut.
 
-## Perubahan kode
+## Yang akan dilakukan
 
-**`supabase/functions/sheets-sync-pull/index.ts`**
+### 1. `supabase/functions/sheets-sync-pull/index.ts`
+- Ubah alias `status` jadi lebih spesifik & ber-prioritas:
+  ```ts
+  status: ["status klien", "status bimbingan", "status"]
+  ```
+  Karena `pickHeaderIndex` mengiterasi alias berurutan dengan `indexOf` exact match dulu, `STATUS KLIEN` akan dipilih sebelum jatuh ke partial-match `STATUS SK`.
+- Tambah alias `case_number`: `"no reg"` sudah ada ✓. Tambah `"no registrasi"` untuk variasi.
+- Tidak menyentuh logika lain — mode tetap "hanya update klien yang sudah ada + impor field tambahan".
 
-1. Perluas `HEADER_ALIASES` dengan key baru:
-   ```
-   address: ["alamat"]
-   phone: ["no telepon", "telepon", "no telp", "hp"]
-   gender: ["jenis kelamin", "jk"]
-   birth_ttl: ["tempat tanggal lahir", "ttl", "tempat/tanggal lahir"]
-   guidance_end: ["pengakhiran bimbingan", "tanggal pengakhiran", "pengakhiran"]
-   guidance_start_asimilasi: ["tanggal asimilasi", "tgl asimilasi"]
-   guidance_start_integrasi: ["tanggal integrasi", "tgl integrasi"]
-   status: ["status"]
-   ```
-2. Resolve index tiap kolom via `pickHeaderIndex`. Yang tidak ada di sheet → di-skip (tidak error).
-3. Helper baru: `parseDateID(s)` (dd/mm/yyyy, dd-mm-yyyy, yyyy-mm-dd) → ISO date / null. `parseTTL(s)` → `{place, date}`. `normGender(s)`. `normStatus(s)`.
-4. Saat update klien existing, bangun:
-   - `profilePatch` berisi hanya field yang nilainya non-empty di baris itu (jangan timpa data dengan string kosong).
-   - `clientPatch` berisi `case_number` + field tambahan non-empty + `assigned_pk_id` (perilaku lama).
-5. Pesan ringkasan tetap sama. Tambahkan info `r.headers_mapped` (object mapping nama kolom → indeks) untuk debugging di summary.
-6. Tidak ada perubahan untuk row yang `case_number`-nya belum ada di DB — tetap `skipped++` dengan pesan "Klien belum ada".
+### 2. `src/pages/dashboard/IntegrasiSpreadsheet.tsx`
+- Ubah placeholder/contoh pada input **Tab Klien** dari `MASTER DATA` menjadi `MASTERDATA` (atau tambah catatan singkat: "tab yang berisi data klien aktual").
 
-**`src/pages/dashboard/IntegrasiSpreadsheet.tsx`**
+### 3. Aksi user (setelah deploy)
+- Buka halaman **Integrasi Spreadsheet**.
+- Ubah field **Tab Klien** dari `MASTER DATA` → **`MASTERDATA`**.
+- Klik **Simpan**, lalu **Tarik dari Sheet**.
 
-- Update teks deskripsi: sebutkan kolom MASTER DATA yang ikut di-update (Nama, Alamat, Telepon, JK, TTL, Pengakhiran, Status, PK).
-- Tidak ada perubahan input/field.
-
-## Tidak ada perubahan
-
-- Tidak ada migrasi schema.
-- Tidak membuat klien baru (mode update saja).
-- Aliases header lain tetap.
-- RLS/policies tidak disentuh.
-
-## Verifikasi
-
-Setelah deploy, jalankan "Tarik dari Sheet". Untuk No. Litmas yang sudah ada di DB, cek `profiles.address/gender/birth_date/birth_place/phone` dan `clients.guidance_start/guidance_end/client_status` terisi sesuai baris MASTER DATA.
+## Yang TIDAK diubah
+- Tidak ada migrasi DB, tidak ada RLS, tidak ada pembuatan klien baru (tetap skip jika `NO REG` belum ada di DB — user pilih opsi ini sebelumnya).
+- Tidak menyentuh `_shared/sheets.ts`, tabel, atau function lain.
