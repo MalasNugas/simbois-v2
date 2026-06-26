@@ -30,7 +30,7 @@ function formatSheetsImportError(error: unknown) {
 }
 
 const HEADER_ALIASES = {
-  case_number: ["no litmas", "no regis", "no register", "no reg", "nomor litmas", "nomor regis", "nomor register", "register", "litmas", "no kasus", "case number"],
+  case_number: ["no litmas", "no regis", "no register", "no reg", "nomor litmas", "nomor regis", "nomor register", "no registrasi", "register", "litmas", "no kasus", "case number"],
   full_name: ["nama lengkap", "nama klien", "nama klien bimbingan", "nama klien pk", "nama", "full name"],
   pk_name: ["pegawai pk", "nama pegawai pk", "pk pembimbing", "pegawai pembimbing", "nama pk", "pembimbing", "pk", "pegawai"],
   address: ["alamat"],
@@ -40,7 +40,7 @@ const HEADER_ALIASES = {
   guidance_end: ["pengakhiran bimbingan", "tanggal pengakhiran", "pengakhiran", "tgl pengakhiran"],
   guidance_start_asimilasi: ["tanggal asimilasi", "tgl asimilasi"],
   guidance_start_integrasi: ["tanggal integrasi", "tgl integrasi"],
-  status: ["status"],
+  status: ["status klien", "status bimbingan", "status"],
 };
 
 const ID_MONTHS: Record<string, number> = {
