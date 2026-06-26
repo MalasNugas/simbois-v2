@@ -280,18 +280,47 @@ Deno.serve(async (req): Promise<Response> => {
       const { data: existingClient } = await admin
         .from("clients").select("id, user_id").eq("case_number", case_number).maybeSingle();
 
-      if (!existingClient) {
-        r.skipped++;
-        r.errors.push(`Baris ${sheetRowNum} (${case_number}): Klien belum ada. Tambah klien via dashboard admin terlebih dahulu.`);
-        continue;
-      }
-
       let assigned_pk_id: string | null = null;
       if (pkName) {
         assigned_pk_id = pegByName.get(pkName) || null;
         if (!assigned_pk_id) {
           r.errors.push(`Baris ${sheetRowNum} (${case_number}): Pegawai PK "${pkNameRaw}" tidak ditemukan — kolom lain tetap di-update.`);
         }
+      }
+
+      let targetUserId: string;
+      let isNew = false;
+      if (existingClient) {
+        targetUserId = existingClient.user_id;
+      } else {
+        // Create pseudo auth user for client (no login required)
+        const safeCase = case_number.replace(/[^a-zA-Z0-9]/g, "-").toLowerCase();
+        const email = `klien-${safeCase}-${Math.random().toString(36).slice(2, 8)}@klien.simbois.local`;
+        const password = crypto.randomUUID() + "Aa1!";
+        const { data: created, error: createErr } = await admin.auth.admin.createUser({
+          email,
+          password,
+          email_confirm: true,
+          user_metadata: { full_name },
+        });
+        if (createErr || !created?.user) {
+          r.skipped++;
+          r.errors.push(`Baris ${sheetRowNum} (${case_number}): Gagal buat akun klien — ${createErr?.message || "unknown"}`);
+          continue;
+        }
+        targetUserId = created.user.id;
+        // Profile auto-created by handle_new_user trigger; insert client row
+        const { error: insErr } = await admin.from("clients").insert({
+          user_id: targetUserId,
+          case_number,
+          assigned_pk_id,
+        });
+        if (insErr) {
+          r.skipped++;
+          r.errors.push(`Baris ${sheetRowNum} (${case_number}): Gagal buat klien — ${insErr.message}`);
+          continue;
+        }
+        isNew = true;
       }
 
       // Build profile patch — only set fields with non-empty values
@@ -301,15 +330,16 @@ Deno.serve(async (req): Promise<Response> => {
       if (genderVal) profilePatch.gender = genderVal;
       if (ttl.place) profilePatch.birth_place = ttl.place;
       if (ttl.date) profilePatch.birth_date = ttl.date;
-      await admin.from("profiles").update(profilePatch).eq("user_id", existingClient.user_id);
+      await admin.from("profiles").update(profilePatch).eq("user_id", targetUserId);
 
       const clientPatch: any = { case_number };
       if (assigned_pk_id !== null || !pkName) clientPatch.assigned_pk_id = assigned_pk_id;
       if (endDate) clientPatch.guidance_end = endDate;
       if (startDate) clientPatch.guidance_start = startDate;
       if (statusVal) clientPatch.client_status = statusVal;
-      await admin.from("clients").update(clientPatch).eq("id", existingClient.id);
-      r.updated++;
+      await admin.from("clients").update(clientPatch).eq("user_id", targetUserId);
+      if (isNew) r.created++; else r.updated++;
+
     }
 
 
