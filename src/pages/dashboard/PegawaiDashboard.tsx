@@ -12,6 +12,7 @@ import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import DailyReportStats from '@/components/dashboard/DailyReportStats';
+import ReportsMap from '@/components/dashboard/ReportsMap';
 
 const MONTHS = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
 
@@ -133,9 +134,14 @@ export default function PegawaiDashboard() {
         <Tabs defaultValue="clients">
           <TabsList>
             <TabsTrigger value="clients">Klien Binaan</TabsTrigger>
+            <TabsTrigger value="map">Peta Lokasi</TabsTrigger>
             <TabsTrigger value="history">Riwayat Wajib Lapor</TabsTrigger>
             <TabsTrigger value="permissions">Riwayat Izin</TabsTrigger>
           </TabsList>
+
+          <TabsContent value="map" className="mt-4">
+            <ReportsMap reports={reports} clients={clients} />
+          </TabsContent>
 
           <TabsContent value="clients" className="mt-4">
             <div className="glass-card rounded-2xl p-4 overflow-x-auto">
