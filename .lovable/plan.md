@@ -1,44 +1,49 @@
-# Dokumentasi SIMBOIS — PDF
+# Rencana: Bersihkan Spreadsheet + Data Demo
 
-Buat satu file PDF berbahasa Indonesia yang menjelaskan website SIMBOIS BAPAS Kelas I Malang secara menyeluruh, disimpan di `/mnt/documents/SIMBOIS-Dokumentasi.pdf` dan dikirim ke user via `<presentation-artifact>`.
+## 1. Hapus Integrasi Spreadsheet
+- Hapus halaman `src/pages/dashboard/IntegrasiSpreadsheet.tsx`.
+- Hapus route `/admin/integrasi-spreadsheet` di `src/App.tsx`.
+- Hapus tombol "Integrasi Spreadsheet" di header `AdminDashboard.tsx`.
+- Hapus Edge Functions: `sheets-list-tabs`, `sheets-test-connection`, `sheets-sync-push`, `sheets-sync-pull`, `sheets-create-import-tabs`, dan `_shared/sheets.ts`.
+- Hapus tabel `sheet_integration_settings` (migration DROP TABLE).
+- Catatan: connector Google Sheets di workspace tidak diputus otomatis — bisa dilepas manual dari Connectors kalau mau.
 
-## Isi dokumen
+## 2. Bersihkan Data Lama
+- Kosongkan tabel `monthly_reports`, `reporting_permissions`, `location_tracking`, `clients`, lalu hapus `profiles`/`user_roles`/`auth.users` untuk semua akun non-admin.
+- Akun admin (`Admin@email.com`) tetap.
 
-1. **Cover** — Judul "SIMBOIS — Sistem Monitoring Bimbingan & Wajib Lapor", subjudul BAPAS Kelas I Malang, tanggal, logo IMIPAS (jika tersedia di `src/assets`).
-2. **Ringkasan Eksekutif** — Tujuan sistem, masalah yang diselesaikan, ringkasan fitur utama.
-3. **Arsitektur & Teknologi** — React + Vite + Tailwind + shadcn-ui, Lovable Cloud (Supabase) untuk DB/Auth/Storage/Edge Functions, integrasi Google Sheets.
-4. **Peran Pengguna**
-   - Admin: login, dashboard penuh, manage Client & Pegawai PK, monitoring, export, integrasi Spreadsheet.
-   - Pegawai PK: login, lihat binaan, beri/cabut izin wajib lapor bulanan.
-   - Client: tanpa login, akses `/wajib-lapor`, cari nama, ambil selfie + GPS, submit.
-5. **Alur Utama (Flow)**
-   - Alur Wajib Lapor Client (search → validasi izin → form + selfie + GPS → submit → status "Sudah Wajib Lapor").
-   - Alur Pemberian Izin oleh PK (awal bulan otomatis "Belum Diizinkan" → tombol "Berikan Izin").
-   - Alur Monitoring Admin (statistik harian/bulanan, grafik 30 hari, export).
-6. **Modul & Halaman**
-   - `/` Landing, `/login`, `/wajib-lapor`, `/dashboard/admin`, `/dashboard/pegawai`, `/admin/integrasi-spreadsheet`.
-7. **Struktur Database** — tabel `clients`, `profiles`, `user_roles`, `monthly_reports`, `reporting_permissions`, `location_tracking`, `sheet_integration_settings` (deskripsi fungsi tiap tabel, tanpa SQL panjang).
-8. **Integrasi Google Spreadsheet** — Tujuan, tab `MASTERDATA`, kolom yang dimapping (NO REG → No. Litmas, NAMA LENGKAP, PK, STATUS KLIEN, dll), tombol Test/Push/Pull, perilaku auto-create klien.
-9. **Keamanan** — RLS di semua tabel publik, role disimpan terpisah di `user_roles`, fungsi `has_role` security definer, bucket selfie privat dengan signed URL.
-10. **Geofencing** — Bounding box Malang (Lat -8.6/-7.55, Lng 112.15/113.5), auto-flag "Di Luar Wilayah".
-11. **Panduan Cepat** — Langkah ringkas untuk Admin, PK, dan Client.
-12. **Roadmap / Catatan** — Fitur yang dihapus (surat, chat, absensi lama) dan alasannya.
+## 3. Seed Data Demo
+Buat via Edge Function baru `seed-demo-data` (admin only) yang memakai Service Role Key untuk `auth.admin.createUser`, lalu insert profil/role/klien. Dipicu sekali dari tombol "Isi Data Demo" di dashboard admin (atau langsung dieksekusi sekali oleh saya via curl).
 
-## Teknis pembuatan
+**2 Pegawai PK** (password `Demo_2026`):
+| Nama | Email |
+|---|---|
+| Budi Santoso, S.H. | budi.pk@simbois.local |
+| Siti Rahmawati, S.Psi. | siti.pk@simbois.local |
 
-- Gunakan Python + `reportlab` (Platypus) untuk layout multi-halaman dengan heading, paragraf, tabel, dan callout.
-- Palet warna sesuai brand SIMBOIS: navy `#0B1E3F` + gold `#C9A24B`, body abu gelap, latar putih.
-- Tipografi: Helvetica-Bold untuk judul, Helvetica untuk body; ukuran sesuai panduan PDF skill.
-- Halaman A4, margin 2cm, header tipis "SIMBOIS — BAPAS Kelas I Malang" + nomor halaman di footer.
-- Embed logo dari `src/assets/logo.svg` (convert ke PNG via Pillow/cairosvg) bila memungkinkan; jika gagal, lewati tanpa error.
-- Tidak menyertakan password admin atau secret apa pun.
+**10 Klien** (5 per Pegawai PK, tanpa login):
 
-## Quality Assurance
+| No. Litmas | Nama | PK | Status |
+|---|---|---|---|
+| 001/BKD/PB/2026 | Ahmad Fauzi | Budi | AKTIF |
+| 002/BKD/PB/2026 | Rina Kartika | Budi | AKTIF |
+| 003/BKD/CB/2026 | Joko Prasetyo | Budi | AKTIF |
+| 004/BKD/PB/2026 | Dewi Anggraini | Budi | AKTIF |
+| 005/BKD/AS/2026 | Hendra Wijaya | Budi | AKTIF |
+| 006/BKD/PB/2026 | Sri Wahyuni | Siti | AKTIF |
+| 007/BKD/CB/2026 | Bagus Nugroho | Siti | AKTIF |
+| 008/BKD/PB/2026 | Lestari Putri | Siti | AKTIF |
+| 009/BKD/AS/2026 | Rudi Hartono | Siti | AKTIF |
+| 010/BKD/PB/2026 | Maya Sari | Siti | AKTIF |
 
-- Render PDF → `pdftoppm -jpeg -r 150` → inspeksi setiap halaman: overflow teks, tabel terpotong, kontras, margin, urutan.
-- Perbaiki dan re-render hingga bersih, lalu ringkas temuan QA dalam pesan akhir.
+Tiap klien diisi: alamat (Malang/Batu), no. telepon, JK, TTL, tgl mulai bimbingan, tgl berakhir.
 
-## Deliverable
+**Contoh aktivitas demo (bulan berjalan):**
+- 4 klien sudah diberi izin wajib lapor oleh PK-nya, 2 di antaranya sudah submit lapor (agar statistik "Sudah/Belum Lapor" dan grafik langsung terlihat).
+- Sisanya "Belum Diizinkan" untuk demo tombol "Berikan Izin".
 
-- `/mnt/documents/SIMBOIS-Dokumentasi.pdf`
-- Tag `<presentation-artifact path="SIMBOIS-Dokumentasi.pdf" mime_type="application/pdf"></presentation-artifact>` di pesan akhir.
+## Urutan Eksekusi
+1. Migration: drop `sheet_integration_settings` + purge data non-admin.
+2. Hapus file frontend + edge functions Sheets.
+3. Buat edge function `seed-demo-data` & panggil sekali.
+4. Verifikasi: login admin → dashboard menampilkan 10 klien, 2 PK, dan statistik terisi.
