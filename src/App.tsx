@@ -10,7 +10,7 @@ import Login from "./pages/Login";
 import WajibLapor from "./pages/WajibLapor";
 import PegawaiDashboard from "./pages/dashboard/PegawaiDashboard";
 import AdminDashboard from "./pages/dashboard/AdminDashboard";
-import IntegrasiSpreadsheet from "./pages/dashboard/IntegrasiSpreadsheet";
+
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -29,7 +29,7 @@ const App = () => (
             <Route path="/login" element={<Login />} />
             <Route path="/dashboard/pegawai" element={<PegawaiDashboard />} />
             <Route path="/dashboard/admin" element={<AdminDashboard />} />
-            <Route path="/admin/integrasi-spreadsheet" element={<IntegrasiSpreadsheet />} />
+            
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>
