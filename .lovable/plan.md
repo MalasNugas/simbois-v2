@@ -1,15 +1,13 @@
 ## Masalah
-Klien Rina (dan 4 klien Budi lainnya) menampilkan `Pegawai PK: -` di halaman Wajib Lapor, walau Budi bisa memberi izin dari dashboard.
+Dashboard Admin menampilkan Rina "Belum Lapor" padahal laporannya sudah ada di database (bulan Juli 2026) dan tampil benar di Dashboard Pegawai PK.
 
 ## Penyebab
-Akun `pegawai1@simbois.local` (Budi Santoso, S.H.) tidak punya baris di tabel `profiles`. Saat rename dari "Marchellino", baris profile ikut terhapus dan tidak dibuat ulang. Fungsi `search_clients_public` melakukan LEFT JOIN ke `profiles` untuk mengambil nama PK — hasilnya NULL → ditampilkan sebagai "-".
+RLS pada tabel `monthly_reports` hanya mengizinkan role **pegawai** dan klien pemilik untuk SELECT. Tidak ada policy untuk role **admin**. Akibatnya query di AdminDashboard mengembalikan array kosong → semua klien terhitung "Belum Lapor". Efek sama berlaku untuk `reporting_permissions`.
 
-## Perbaikan (1 langkah, data-only)
-Insert baris profile untuk user_id `f9e13bd7-6cdc-46bd-9a01-8ef772050890`:
-- `full_name`: "Budi Santoso, S.H."
-- `phone`: (kosong / opsional)
+## Perbaikan (1 migration, tanpa perubahan kode)
+Tambah SELECT policy untuk admin di dua tabel:
 
-Tidak ada perubahan kode/skema. Setelah insert, refresh `/wajib-lapor` dan nama PK akan muncul untuk kelima klien binaan Budi.
+- `monthly_reports`: `CREATE POLICY "Admin can view all reports" FOR SELECT USING (has_role(auth.uid(), 'admin'))`
+- `reporting_permissions`: `CREATE POLICY "Admin can view all permissions" FOR SELECT USING (has_role(auth.uid(), 'admin'))` (juga tampil di dashboard admin)
 
-## Pencegahan (opsional, bisa ditunda)
-Tambahkan trigger `handle_new_user` sudah ada untuk auth.users, tapi profile Budi terhapus manual di luar flow signup. Untuk mencegah kejadian serupa saat rename akun, ke depan cukup UPDATE `profiles.full_name` — jangan DELETE lalu re-insert.
+Setelah migrasi, refresh Dashboard Admin — status Rina otomatis berubah menjadi "Sudah", statistik "Sudah/Belum Lapor" dan grafik 12 bulan akan akurat.

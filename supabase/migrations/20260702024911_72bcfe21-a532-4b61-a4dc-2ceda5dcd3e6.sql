@@ -1,0 +1,2 @@
+CREATE POLICY "Admin can view all reports" ON public.monthly_reports FOR SELECT USING (has_role(auth.uid(), 'admin'));
+CREATE POLICY "Admin can view all permissions" ON public.reporting_permissions FOR SELECT USING (has_role(auth.uid(), 'admin'));
